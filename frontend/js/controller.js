@@ -166,7 +166,24 @@ function ligarSaque() {
 
 async function enviarTransferencia(botao, { idOrigem, idDestino, valor, chaveIdempotencia }) {
   await executar(botao, async () => {
-    const resultado = await api.transferir({ idOrigem, idDestino, valor, chaveIdempotencia });
+    let resultado;
+    try {
+      resultado = await api.transferir({ idOrigem, idDestino, valor, chaveIdempotencia });
+    } catch (erro) {
+      if (erro.status !== 502) {
+        throw erro;
+      }
+      // Limitacao conhecida do Sprint 1: a agencia de destino caiu depois do debito.
+      // Recarregamos a conta de origem justamente para deixar visivel que o dinheiro
+      // saiu e nao chegou em lugar nenhum.
+      tratarErro(erro);
+      const contaDebitada = await api.consultarConta(idOrigem);
+      view.desenharConta(contaDebitada);
+      view.registrarNoDiario(
+        `Inconsistencia: conta ${idOrigem} ficou com saldo ${contaDebitada.saldo} e o destino nao recebeu.`,
+        'erro');
+      return;
+    }
 
     const rotulo = resultado.entreAgencias
       ? `entre agencias (destino na Agencia ${api.agenciaResponsavel(idDestino)})`
