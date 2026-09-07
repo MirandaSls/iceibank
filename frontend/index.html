@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ICEIBank</title>
+  <link rel="stylesheet" href="css/estilo.css">
+</head>
+<body>
+
+  <!-- ============================= TELA DE LOGIN ============================= -->
+  <section id="tela-login" class="tela tela--ativa">
+    <div class="cartao-login">
+      <header class="marca">
+        <span class="marca__simbolo" aria-hidden="true">₵</span>
+        <h1 class="marca__nome">ICEIBank</h1>
+        <p class="marca__legenda">Banco distribuido em 3 agencias</p>
+      </header>
+
+      <form id="form-login" class="formulario" autocomplete="off">
+        <label class="campo">
+          <span class="campo__rotulo">Usuario</span>
+          <input id="login-usuario" name="usuario" type="text" required placeholder="ana" autocomplete="username">
+        </label>
+
+        <label class="campo">
+          <span class="campo__rotulo">Senha</span>
+          <input id="login-senha" name="senha" type="password" required placeholder="senha123" autocomplete="current-password">
+        </label>
+
+        <label class="campo">
+          <span class="campo__rotulo">Agencia de entrada</span>
+          <select id="login-agencia" name="agencia"></select>
+          <small class="campo__ajuda">Cada agencia so responde pelas contas cujo id % 3 e igual ao id dela.</small>
+        </label>
+
+        <button type="submit" class="botao botao--primario" id="botao-entrar">
+          <span class="botao__texto">Entrar</span>
+        </button>
+      </form>
+
+      <div id="alerta-login" class="alerta" role="alert" hidden></div>
+    </div>
+  </section>
+
+  <!-- ============================== TELA DO APP ============================== -->
+  <section id="tela-app" class="tela">
+    <header class="barra">
+      <div class="barra__marca">
+        <span class="marca__simbolo marca__simbolo--pequeno" aria-hidden="true">₵</span>
+        <strong>ICEIBank</strong>
+      </div>
+
+      <div class="barra__acoes">
+        <label class="seletor-agencia">
+          <span>Agencia</span>
+          <select id="seletor-agencia"></select>
+        </label>
+        <span class="barra__usuario" id="rotulo-usuario"></span>
+        <button type="button" class="botao botao--fantasma" id="botao-sair">Sair</button>
+      </div>
+    </header>
+
+    <main class="conteudo">
+
+      <!-- Coluna 1: conta em foco -->
+      <section class="painel painel--conta" aria-labelledby="titulo-conta">
+        <h2 id="titulo-conta" class="painel__titulo">Conta</h2>
+
+        <form id="form-consulta" class="linha-consulta">
+          <label class="campo campo--compacto">
+            <span class="campo__rotulo">Numero da conta</span>
+            <input id="consulta-id" type="number" min="0" step="1" placeholder="0" required>
+          </label>
+          <button type="submit" class="botao botao--primario">Consultar</button>
+        </form>
+
+        <details class="revelacao">
+          <summary>A conta ainda nao existe? Criar nesta agencia</summary>
+          <form id="form-criar" class="formulario formulario--interno">
+            <label class="campo">
+              <span class="campo__rotulo">Numero da conta</span>
+              <input id="criar-id" type="number" min="0" step="1" placeholder="0" required>
+            </label>
+            <label class="campo">
+              <span class="campo__rotulo">Titular</span>
+              <input id="criar-nome" type="text" placeholder="Ana" required>
+            </label>
+            <label class="campo">
+              <span class="campo__rotulo">Saldo inicial</span>
+              <input id="criar-saldo" type="number" min="0" step="0.01" placeholder="100" required>
+            </label>
+            <button type="submit" class="botao botao--fantasma">Criar conta</button>
+          </form>
+        </details>
+
+        <div id="estado-vazio" class="estado-vazio">
+          <div class="estado-vazio__seta" aria-hidden="true">&uarr;</div>
+          <p>Informe um numero de conta para comecar.</p>
+          <p class="estado-vazio__dica">A conta <strong>0</strong> vive na Agencia 0, a <strong>1</strong> na Agencia 1, a <strong>2</strong> na Agencia 2, a <strong>3</strong> volta para a Agencia 0.</p>
+        </div>
+
+        <article id="cartao-conta" class="cartao-conta" hidden>
+          <div class="cartao-conta__cabecalho">
+            <span class="etiqueta" id="conta-agencia"></span>
+            <h3 id="conta-titular"></h3>
+          </div>
+          <p class="cartao-conta__rotulo">Saldo disponivel</p>
+          <p class="cartao-conta__saldo"><span class="cartao-conta__moeda">R$</span><span id="conta-saldo">0,00</span></p>
+          <p class="cartao-conta__id">Conta <span id="conta-id"></span></p>
+        </article>
+      </section>
+
+      <!-- Coluna 2: operacoes -->
+      <section class="painel painel--operacoes" aria-labelledby="titulo-operacoes">
+        <h2 id="titulo-operacoes" class="painel__titulo">Operacoes</h2>
+
+        <div class="abas" role="tablist">
+          <button class="aba aba--ativa" role="tab" data-aba="depositar" aria-selected="true">Depositar</button>
+          <button class="aba" role="tab" data-aba="sacar" aria-selected="false">Sacar</button>
+          <button class="aba" role="tab" data-aba="transferir" aria-selected="false">Transferir</button>
+        </div>
+
+        <div class="abas__conteudo">
+          <form id="form-depositar" class="formulario painel-aba painel-aba--ativa" data-aba="depositar">
+            <label class="campo">
+              <span class="campo__rotulo">Valor do deposito</span>
+              <input id="deposito-valor" type="number" min="0.01" step="0.01" placeholder="50" required>
+            </label>
+            <button type="submit" class="botao botao--primario">Depositar</button>
+          </form>
+
+          <form id="form-sacar" class="formulario painel-aba" data-aba="sacar" hidden>
+            <label class="campo">
+              <span class="campo__rotulo">Valor do saque</span>
+              <input id="saque-valor" type="number" min="0.01" step="0.01" placeholder="20" required>
+            </label>
+            <button type="submit" class="botao botao--primario">Sacar</button>
+          </form>
+
+          <form id="form-transferir" class="formulario painel-aba" data-aba="transferir" hidden>
+            <label class="campo">
+              <span class="campo__rotulo">Conta de destino</span>
+              <input id="transferencia-destino" type="number" min="0" step="1" placeholder="1" required>
+              <small class="campo__ajuda" id="dica-destino">O sistema descobre sozinho se o destino e local ou de outra agencia.</small>
+            </label>
+            <label class="campo">
+              <span class="campo__rotulo">Valor</span>
+              <input id="transferencia-valor" type="number" min="0.01" step="0.01" placeholder="30" required>
+            </label>
+            <label class="opcao">
+              <input id="transferencia-idempotente" type="checkbox" checked>
+              <span>Proteger contra reenvio duplicado (<code>Idempotency-Key</code>)</span>
+            </label>
+            <button type="submit" class="botao botao--primario">Transferir</button>
+          </form>
+        </div>
+
+        <div id="alerta-app" class="alerta" role="alert" hidden></div>
+
+        <div id="bloco-reenvio" class="reenvio" hidden>
+          <p class="reenvio__texto">Ultima transferencia protegida por chave de idempotencia.</p>
+          <button type="button" class="botao botao--fantasma" id="botao-reenviar">Reenviar a mesma requisicao</button>
+        </div>
+      </section>
+
+      <!-- Coluna 3: historico da sessao -->
+      <section class="painel painel--diario" aria-labelledby="titulo-diario">
+        <h2 id="titulo-diario" class="painel__titulo">Diario da sessao</h2>
+        <ol id="diario" class="diario"></ol>
+        <p id="diario-vazio" class="diario__vazio">As respostas da API aparecem aqui, na ordem em que chegaram.</p>
+      </section>
+
+    </main>
+  </section>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

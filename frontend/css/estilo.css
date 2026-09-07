@@ -1,0 +1,453 @@
+/* =========================================================================
+   ICEIBank - folha de estilo unica (View)
+   Paleta: azul-tinta profundo + ambar. Numeros em fonte tabular.
+   ========================================================================= */
+
+:root {
+  --tinta-900: #0b1220;
+  --tinta-800: #111a2b;
+  --tinta-700: #17233a;
+  --tinta-600: #1f2f4c;
+  --linha: #24344f;
+
+  --texto: #e9eef7;
+  --texto-suave: #9aabc6;
+  --texto-fraco: #6b7d99;
+
+  --ambar: #f0b429;
+  --ambar-forte: #ffc94a;
+  --verde: #37b98a;
+  --vermelho: #ef5f5f;
+
+  --raio: 14px;
+  --raio-pequeno: 9px;
+  --entrada: cubic-bezier(0.16, 1, 0.3, 1);
+  --saida: cubic-bezier(0.4, 0, 1, 1);
+  --sombra: 0 18px 45px rgba(0, 0, 0, 0.45);
+}
+
+* { box-sizing: border-box; }
+
+/* precisa vir com !important: regras como .formulario { display: grid } venceriam o
+   display:none que o navegador aplica a elementos com o atributo hidden */
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+  color: var(--texto);
+  background:
+    radial-gradient(1100px 600px at 12% -10%, #1b2b47 0%, transparent 60%),
+    radial-gradient(900px 500px at 105% 0%, #2a2033 0%, transparent 55%),
+    var(--tinta-900);
+}
+
+h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
+
+code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 0.85em; }
+
+/* --------------------------------- telas -------------------------------- */
+
+.tela {
+  display: none;
+  animation: entrar 380ms var(--entrada) both;
+}
+
+.tela--ativa { display: block; }
+
+@keyframes entrar {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* --------------------------------- login -------------------------------- */
+
+#tela-login.tela--ativa {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.cartao-login {
+  width: min(420px, 100%);
+  padding: 34px 32px 30px;
+  background: linear-gradient(180deg, var(--tinta-700), var(--tinta-800));
+  border: 1px solid var(--linha);
+  border-radius: 20px;
+  box-shadow: var(--sombra);
+}
+
+.marca { text-align: center; margin-bottom: 26px; }
+
+.marca__simbolo {
+  display: inline-grid;
+  place-items: center;
+  width: 52px; height: 52px;
+  margin-bottom: 12px;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--tinta-900);
+  background: linear-gradient(160deg, var(--ambar-forte), var(--ambar));
+  border-radius: 16px;
+  box-shadow: 0 8px 22px rgba(240, 180, 41, 0.28);
+}
+
+.marca__simbolo--pequeno {
+  width: 30px; height: 30px;
+  margin: 0;
+  font-size: 16px;
+  border-radius: 9px;
+}
+
+.marca__nome { font-size: 27px; font-family: ui-serif, Georgia, "Times New Roman", serif; }
+.marca__legenda { margin: 6px 0 0; color: var(--texto-fraco); font-size: 13px; }
+
+/* -------------------------------- campos -------------------------------- */
+
+.formulario { display: grid; gap: 16px; }
+
+.campo { display: grid; gap: 6px; }
+.campo--compacto { flex: 1; }
+
+.campo__rotulo {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--texto-suave);
+}
+
+.campo__ajuda { color: var(--texto-fraco); font-size: 11.5px; line-height: 1.45; }
+
+input, select {
+  width: 100%;
+  padding: 11px 13px;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  color: var(--texto);
+  background: var(--tinta-900);
+  border: 1px solid var(--linha);
+  border-radius: var(--raio-pequeno);
+  transition: border-color 140ms var(--entrada), box-shadow 140ms var(--entrada);
+}
+
+input:focus-visible, select:focus-visible {
+  outline: none;
+  border-color: var(--ambar);
+  box-shadow: 0 0 0 3px rgba(240, 180, 41, 0.18);
+}
+
+.opcao {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  color: var(--texto-suave);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.opcao input { width: auto; margin-top: 1px; }
+
+/* -------------------------------- botoes -------------------------------- */
+
+.botao {
+  padding: 11px 17px;
+  font: inherit;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: var(--raio-pequeno);
+  cursor: pointer;
+  transition: transform 120ms cubic-bezier(0.2, 0, 0, 1),
+              background-color 140ms var(--entrada),
+              opacity 140ms var(--entrada);
+}
+
+.botao--primario { color: var(--tinta-900); background: linear-gradient(160deg, var(--ambar-forte), var(--ambar)); }
+.botao--primario:hover { background: var(--ambar-forte); }
+.botao--primario:active { transform: scale(0.985); }
+
+.botao--fantasma {
+  color: var(--texto-suave);
+  background: transparent;
+  border-color: var(--linha);
+}
+.botao--fantasma:hover { color: var(--texto); border-color: var(--texto-fraco); }
+
+.botao[disabled] { opacity: 0.55; cursor: progress; }
+
+.botao--ocupado .botao__texto::after {
+  content: "";
+  display: inline-block;
+  width: 11px; height: 11px;
+  margin-left: 9px;
+  vertical-align: -1px;
+  border: 2px solid rgba(11, 18, 32, 0.35);
+  border-top-color: var(--tinta-900);
+  border-radius: 50%;
+  animation: girar 700ms linear infinite;
+}
+
+@keyframes girar { to { transform: rotate(360deg); } }
+
+/* -------------------------------- alertas ------------------------------- */
+
+.alerta {
+  margin-top: 18px;
+  padding: 12px 14px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  border-radius: var(--raio-pequeno);
+  border-left: 3px solid var(--vermelho);
+  background: rgba(239, 95, 95, 0.12);
+  color: #ffd9d9;
+  animation: entrar 260ms var(--entrada) both;
+}
+
+.alerta--sucesso {
+  border-left-color: var(--verde);
+  background: rgba(55, 185, 138, 0.12);
+  color: #ccf6e6;
+}
+
+.alerta--aviso {
+  border-left-color: var(--ambar);
+  background: rgba(240, 180, 41, 0.12);
+  color: #ffe9b8;
+}
+
+/* -------------------------------- barra --------------------------------- */
+
+.barra {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 26px;
+  border-bottom: 1px solid var(--linha);
+  background: rgba(11, 18, 32, 0.72);
+  backdrop-filter: blur(8px);
+}
+
+.barra__marca { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+.barra__acoes { display: flex; align-items: center; gap: 14px; }
+.barra__usuario { color: var(--texto-suave); font-size: 13.5px; }
+
+.seletor-agencia { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--texto-suave); }
+.seletor-agencia select { width: auto; padding: 7px 10px; }
+
+/* ------------------------------- conteudo ------------------------------- */
+
+.conteudo {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr 1fr;
+  gap: 20px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 26px;
+}
+
+@media (max-width: 900px) {
+  .conteudo { grid-template-columns: 1fr; }
+}
+
+.painel {
+  padding: 20px;
+  background: linear-gradient(180deg, var(--tinta-700), var(--tinta-800));
+  border: 1px solid var(--linha);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+}
+
+.painel__titulo {
+  margin-bottom: 16px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--texto-fraco);
+}
+
+.linha-consulta { display: flex; gap: 10px; align-items: flex-end; }
+
+/* ---------------------------- revelacao --------------------------------- */
+
+.revelacao { margin-top: 16px; }
+
+.revelacao summary {
+  padding: 8px 0;
+  font-size: 12.5px;
+  color: var(--texto-suave);
+  cursor: pointer;
+  list-style: none;
+  transition: color 140ms var(--entrada);
+}
+
+.revelacao summary::before {
+  content: "+";
+  display: inline-block;
+  width: 15px;
+  color: var(--ambar);
+  transition: transform 220ms var(--entrada);
+}
+
+.revelacao[open] summary::before { content: "-"; }
+.revelacao summary:hover { color: var(--texto); }
+
+.formulario--interno {
+  padding: 14px;
+  margin-top: 6px;
+  background: var(--tinta-900);
+  border: 1px solid var(--linha);
+  border-radius: var(--raio-pequeno);
+  animation: entrar 300ms var(--entrada) both;
+}
+
+/* ----------------------------- estado vazio ----------------------------- */
+
+.estado-vazio {
+  margin-top: 22px;
+  text-align: center;
+  color: var(--texto-suave);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.estado-vazio__seta {
+  font-size: 22px;
+  color: var(--ambar);
+  animation: flutuar 1.9s ease-in-out infinite;
+}
+
+.estado-vazio__dica { color: var(--texto-fraco); font-size: 12px; }
+
+@keyframes flutuar {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+
+/* ----------------------------- cartao conta ----------------------------- */
+
+.cartao-conta {
+  margin-top: 20px;
+  padding: 20px;
+  background:
+    radial-gradient(400px 160px at 100% 0%, rgba(240, 180, 41, 0.14), transparent 70%),
+    var(--tinta-600);
+  border: 1px solid var(--linha);
+  border-radius: var(--raio);
+  animation: entrar 380ms var(--entrada) both;
+}
+
+.cartao-conta__cabecalho { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+
+.etiqueta {
+  padding: 4px 9px;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--ambar-forte);
+  background: rgba(240, 180, 41, 0.13);
+  border-radius: 999px;
+}
+
+.cartao-conta__rotulo { margin: 0; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--texto-fraco); }
+
+.cartao-conta__saldo {
+  margin: 4px 0 0;
+  font-size: 34px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.cartao-conta__moeda { margin-right: 6px; font-size: 17px; color: var(--texto-suave); }
+.cartao-conta__id { margin: 14px 0 0; font-size: 12px; color: var(--texto-fraco); }
+
+.cartao-conta--pulsa { animation: pulsar 620ms var(--entrada); }
+
+@keyframes pulsar {
+  0%   { box-shadow: 0 0 0 0 rgba(55, 185, 138, 0.45); }
+  100% { box-shadow: 0 0 0 18px rgba(55, 185, 138, 0); }
+}
+
+/* --------------------------------- abas --------------------------------- */
+
+.abas {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 18px;
+  background: var(--tinta-900);
+  border: 1px solid var(--linha);
+  border-radius: var(--raio-pequeno);
+}
+
+.aba {
+  flex: 1;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--texto-suave);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 140ms var(--entrada), background-color 220ms var(--entrada);
+}
+
+.aba--ativa { color: var(--tinta-900); background: var(--ambar); font-weight: 600; }
+
+.painel-aba { animation: deslizar-direita 300ms var(--entrada) both; }
+.painel-aba--voltando { animation: deslizar-esquerda 300ms var(--entrada) both; }
+
+@keyframes deslizar-direita {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes deslizar-esquerda {
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* -------------------------------- reenvio ------------------------------- */
+
+.reenvio {
+  margin-top: 16px;
+  padding: 13px 14px;
+  border: 1px dashed var(--linha);
+  border-radius: var(--raio-pequeno);
+  animation: entrar 300ms var(--entrada) both;
+}
+
+.reenvio__texto { margin: 0 0 10px; font-size: 12.5px; color: var(--texto-suave); line-height: 1.45; }
+
+/* -------------------------------- diario -------------------------------- */
+
+.diario { margin: 0; padding: 0; list-style: none; display: grid; gap: 9px; max-height: 460px; overflow-y: auto; }
+
+.diario__item {
+  padding: 10px 12px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  background: var(--tinta-900);
+  border-left: 3px solid var(--linha);
+  border-radius: var(--raio-pequeno);
+  animation: entrar 300ms var(--entrada) both;
+}
+
+.diario__item--ok { border-left-color: var(--verde); }
+.diario__item--erro { border-left-color: var(--vermelho); }
+
+.diario__hora { display: block; color: var(--texto-fraco); font-size: 11px; margin-bottom: 3px; font-variant-numeric: tabular-nums; }
+.diario__vazio { color: var(--texto-fraco); font-size: 12.5px; line-height: 1.5; }
+
+/* ------------------------- movimento reduzido --------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -24,6 +24,8 @@ public class CorsConfig {
         configuracao.addAllowedOriginPattern("*");
         configuracao.addAllowedHeader("*");
         configuracao.addAllowedMethod("*");
+        // sem isto o JavaScript nao consegue ler o cabecalho de resposta da idempotencia
+        configuracao.addExposedHeader("Idempotency-Replayed");
 
         UrlBasedCorsConfigurationSource origem = new UrlBasedCorsConfigurationSource();
         origem.registerCorsConfiguration("/**", configuracao);

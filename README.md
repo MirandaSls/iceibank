@@ -26,13 +26,17 @@ iceibank/
 
 ## Como executar
 
-O OFFSET pessoal deste projeto e **45**, logo a porta base e `4045`.
+O OFFSET pessoal deste projeto e **45**, logo a porta base e `4145`.
 
 | Agencia | Porta |
 |---|---|
-| 0 | 4045 |
-| 1 | 4046 |
-| 2 | 4047 |
+| 0 | 4145 |
+| 1 | 4146 |
+| 2 | 4147 |
+
+> O roteiro sugere `4000 + OFFSET`. Aqui a base e `4100 + OFFSET` porque a porta 4045 esta na
+> lista de portas bloqueadas por Chrome e Firefox (servico `lockd`): o navegador recusa a
+> chamada com `ERR_UNSAFE_PORT` e o frontend nao conseguiria falar com a Agencia 0.
 
 Compilar uma vez:
 
