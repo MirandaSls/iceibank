@@ -2,6 +2,8 @@ package br.pucminas.icei.iceibank.agencia;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.hamcrest.Matchers.startsWith;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
@@ -11,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import br.pucminas.icei.iceibank.agencia.config.ConfigAgencias;
 import br.pucminas.icei.iceibank.agencia.model.Conta;
 import br.pucminas.icei.iceibank.agencia.model.EstadoAgencia;
+import br.pucminas.icei.iceibank.agencia.security.JwtService;
 import br.pucminas.icei.iceibank.agencia.service.RegistroEventos;
 import java.math.BigDecimal;
 import java.util.List;
@@ -20,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.servlet.MockMvc;
@@ -40,6 +44,9 @@ class TransferenciasControllerTest {
     private EstadoAgencia estado;
 
     @Autowired
+    private JwtService jwtService;
+
+    @Autowired
     private RestTemplate restTemplate;
 
     private MockRestServiceServer agenciaDeDestino;
@@ -57,6 +64,7 @@ class TransferenciasControllerTest {
     @DisplayName("transferencia local move o saldo entre duas contas da mesma agencia")
     void transferenciaLocal() throws Exception {
         mockMvc.perform(post("/transferencias").contentType(MediaType.APPLICATION_JSON)
+                        .with(TokenDeTeste.deUsuario(jwtService))
                         .content("{\"idOrigem\":0,\"idDestino\":3,\"valor\":30}"))
                 .andExpect(status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
@@ -70,6 +78,7 @@ class TransferenciasControllerTest {
     @DisplayName("transferencia local para conta inexistente devolve 404 e devolve o dinheiro")
     void transferenciaLocalParaContaInexistente() throws Exception {
         mockMvc.perform(post("/transferencias").contentType(MediaType.APPLICATION_JSON)
+                        .with(TokenDeTeste.deUsuario(jwtService))
                         .content("{\"idOrigem\":0,\"idDestino\":6,\"valor\":30}"))
                 .andExpect(status().isNotFound());
 
@@ -80,6 +89,7 @@ class TransferenciasControllerTest {
     @DisplayName("transferencia sem saldo e recusada antes de qualquer debito")
     void transferenciaSemSaldo() throws Exception {
         mockMvc.perform(post("/transferencias").contentType(MediaType.APPLICATION_JSON)
+                        .with(TokenDeTeste.deUsuario(jwtService))
                         .content("{\"idOrigem\":0,\"idDestino\":3,\"valor\":500}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
@@ -98,10 +108,13 @@ class TransferenciasControllerTest {
                 .andExpect(jsonPath("$.origemAgencia").value(0))
                 // regra 2 de Lamport: o debito consome um tick, o envio consome o seguinte
                 .andExpect(jsonPath("$.timestampLamport").value(contadorAntes + 2))
+                // a chamada entre agencias vai autenticada com um token de servico
+                .andExpect(header(HttpHeaders.AUTHORIZATION, startsWith("Bearer ")))
                 .andRespond(withSuccess("{\"mensagem\":\"Credito remoto aplicado.\"}",
                         MediaType.APPLICATION_JSON));
 
         mockMvc.perform(post("/transferencias").contentType(MediaType.APPLICATION_JSON)
+                        .with(TokenDeTeste.deUsuario(jwtService))
                         .content("{\"idOrigem\":0,\"idDestino\":1,\"valor\":30}"))
                 .andExpect(status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
@@ -120,6 +133,7 @@ class TransferenciasControllerTest {
                 });
 
         mockMvc.perform(post("/transferencias").contentType(MediaType.APPLICATION_JSON)
+                        .with(TokenDeTeste.deUsuario(jwtService))
                         .content("{\"idOrigem\":0,\"idDestino\":1,\"valor\":30}"))
                 .andExpect(status().isBadGateway())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
@@ -139,6 +153,7 @@ class TransferenciasControllerTest {
         int timestampRecebido = contadorAntes + 40;
 
         mockMvc.perform(post("/contas/0/creditar-remoto").contentType(MediaType.APPLICATION_JSON)
+                        .with(TokenDeTeste.deServico(jwtService, 1))
                         .content("{\"valor\":15,\"timestampLamport\":" + timestampRecebido
                                 + ",\"origemAgencia\":1}"))
                 .andExpect(status().isOk())

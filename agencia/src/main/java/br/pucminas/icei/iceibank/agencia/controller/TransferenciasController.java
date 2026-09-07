@@ -8,8 +8,12 @@ import br.pucminas.icei.iceibank.agencia.dto.Erro;
 import br.pucminas.icei.iceibank.agencia.dto.TransferenciaRequest;
 import br.pucminas.icei.iceibank.agencia.model.Conta;
 import br.pucminas.icei.iceibank.agencia.model.EstadoAgencia;
+import br.pucminas.icei.iceibank.agencia.security.JwtService;
 import java.util.Map;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,10 +28,12 @@ public class TransferenciasController {
 
     private final EstadoAgencia estado;
     private final RestTemplate restTemplate;
+    private final JwtService jwtService;
 
-    public TransferenciasController(EstadoAgencia estado, RestTemplate restTemplate) {
+    public TransferenciasController(EstadoAgencia estado, RestTemplate restTemplate, JwtService jwtService) {
         this.estado = estado;
         this.restTemplate = restTemplate;
+        this.jwtService = jwtService;
     }
 
     @PostMapping("/transferencias")
@@ -84,10 +90,19 @@ public class TransferenciasController {
         int tsEnvio = estado.relogio().aoEnviar();
         String urlDestino = ConfigAgencias.urlDaAgencia(agenciaDestino);
 
+        // A chamada entre agencias tambem e autenticada, mas com um token de SERVICO de vida
+        // curta emitido pela propria agencia de origem - nao com o token da pessoa que iniciou
+        // a transferencia (ver justificativa em RESPOSTAS.md).
+        HttpHeaders cabecalhos = new HttpHeaders();
+        cabecalhos.setContentType(MediaType.APPLICATION_JSON);
+        cabecalhos.setBearerAuth(jwtService.gerarTokenDeServico(estado.idAgencia()));
+
         try {
             restTemplate.postForObject(
                     urlDestino + "/contas/" + idDestino + "/creditar-remoto",
-                    new CreditoRemotoRequest(requisicao.valor(), tsEnvio, estado.idAgencia()),
+                    new HttpEntity<>(
+                            new CreditoRemotoRequest(requisicao.valor(), tsEnvio, estado.idAgencia()),
+                            cabecalhos),
                     String.class);
 
             estado.registro().registrar("TRANSFERENCIA_ENVIADA", tsEnvio, detalhes(
