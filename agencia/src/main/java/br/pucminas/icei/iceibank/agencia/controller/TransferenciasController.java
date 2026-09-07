@@ -8,6 +8,7 @@ import br.pucminas.icei.iceibank.agencia.dto.Erro;
 import br.pucminas.icei.iceibank.agencia.dto.TransferenciaRequest;
 import br.pucminas.icei.iceibank.agencia.model.Conta;
 import br.pucminas.icei.iceibank.agencia.model.EstadoAgencia;
+import br.pucminas.icei.iceibank.agencia.model.EstadoAgencia.ResultadoTransferencia;
 import br.pucminas.icei.iceibank.agencia.security.JwtService;
 import java.util.Map;
 import org.springframework.http.HttpEntity;
@@ -18,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
@@ -36,8 +38,55 @@ public class TransferenciasController {
         this.jwtService = jwtService;
     }
 
+    /**
+     * Transferencia entre contas.
+     *
+     * <p>Aceita o cabecalho opcional {@code Idempotency-Key} (funcionalidade adicional do
+     * Sprint 1): com ele, reenviar a mesma requisicao devolve o resultado da primeira tentativa
+     * em vez de debitar de novo.
+     */
     @PostMapping("/transferencias")
-    public ResponseEntity<?> transferir(@RequestBody TransferenciaRequest requisicao) {
+    public ResponseEntity<?> transferir(
+            @RequestHeader(value = "Idempotency-Key", required = false) String chaveIdempotencia,
+            @RequestBody TransferenciaRequest requisicao) {
+
+        if (chaveIdempotencia == null || chaveIdempotencia.isBlank()) {
+            return executarTransferencia(requisicao);
+        }
+
+        String chave = chaveIdempotencia.trim();
+        String impressaoDigital = impressaoDigital(requisicao);
+
+        synchronized (estado.chavesDeIdempotencia()) {
+            ResultadoTransferencia jaProcessada = estado.chavesDeIdempotencia().get(chave);
+            if (jaProcessada != null) {
+                if (!jaProcessada.impressaoDigital().equals(impressaoDigital)) {
+                    estado.registro().registrar("IDEMPOTENCIA_CHAVE_REUTILIZADA",
+                            estado.relogio().eventoLocal(), detalhes("chave", chave));
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(new Erro(
+                            "Chave de idempotencia ja usada para uma transferencia diferente."));
+                }
+                estado.registro().registrar("TRANSFERENCIA_REPETIDA_IGNORADA",
+                        estado.relogio().eventoLocal(), detalhes("chave", chave));
+                return ResponseEntity.status(jaProcessada.status())
+                        .header("Idempotency-Replayed", "true")
+                        .body(jaProcessada.corpo());
+            }
+
+            ResponseEntity<?> resposta = executarTransferencia(requisicao);
+            estado.chavesDeIdempotencia().put(chave,
+                    new ResultadoTransferencia(impressaoDigital, resposta.getStatusCode().value(),
+                            resposta.getBody()));
+            return resposta;
+        }
+    }
+
+    private static String impressaoDigital(TransferenciaRequest requisicao) {
+        return requisicao.idOrigem() + "|" + requisicao.idDestino() + "|"
+                + (requisicao.valor() == null ? "null" : requisicao.valor().stripTrailingZeros().toPlainString());
+    }
+
+    private ResponseEntity<?> executarTransferencia(TransferenciaRequest requisicao) {
         if (requisicao.idOrigem() == null || requisicao.idDestino() == null
                 || requisicao.valor() == null || requisicao.valor().signum() <= 0) {
             return ResponseEntity.badRequest()

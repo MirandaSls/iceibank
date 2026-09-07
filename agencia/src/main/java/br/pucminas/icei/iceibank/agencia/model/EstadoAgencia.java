@@ -19,6 +19,7 @@ public class EstadoAgencia {
     private final RelogioLamport relogio = new RelogioLamport();
     private final RegistroEventos registro;
     private final Map<Integer, Conta> contas = new ConcurrentHashMap<>();
+    private final Map<String, ResultadoTransferencia> chavesDeIdempotencia = new ConcurrentHashMap<>();
 
     public EstadoAgencia(
             @Value("${iceibank.agencia.id:0}") int idAgencia,
@@ -45,5 +46,23 @@ public class EstadoAgencia {
 
     public Map<Integer, Conta> contas() {
         return contas;
+    }
+
+    /**
+     * Resultados ja produzidos para cada {@code Idempotency-Key} recebida (funcionalidade
+     * adicional do Sprint 1). Vive em memoria, junto com as contas.
+     */
+    public Map<String, ResultadoTransferencia> chavesDeIdempotencia() {
+        return chavesDeIdempotencia;
+    }
+
+    /**
+     * Resposta guardada de uma transferencia ja processada.
+     *
+     * @param impressaoDigital resumo do corpo original, para detectar reuso indevido da chave
+     * @param status codigo HTTP devolvido na primeira tentativa
+     * @param corpo corpo devolvido na primeira tentativa
+     */
+    public record ResultadoTransferencia(String impressaoDigital, int status, Object corpo) {
     }
 }
