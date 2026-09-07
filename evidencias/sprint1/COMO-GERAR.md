@@ -21,6 +21,10 @@ cd agencia; $env:AGENCIA_ID=2; mvn spring-boot:run
 cd frontend; python -m http.server 5500
 ```
 
+> Dica usada nos prints deste repositorio: acrescente `| ConvertTo-Json -Compress` no fim das
+> chamadas que devolvem uma conta. A resposta sai em uma linha so (`{"id":0,"nomeAluno":"Ana",
+> "saldo":70}`), o que deixa o print bem mais legivel do que a tabela padrao do PowerShell.
+
 Em um quinto terminal (o de testes), pegue um token e guarde numa variável:
 
 ```powershell
@@ -70,7 +74,10 @@ Invoke-RestMethod -Uri "http://localhost:4145/contas/0" -Headers $h          # s
 try {
   Invoke-RestMethod -Uri "http://localhost:4145/transferencias" -Method Post -Headers $h -ContentType "application/json" -Body '{"idOrigem":0,"idDestino":2,"valor":10}'
 } catch {
-  $_.ErrorDetails.Message                                                     # corpo do 502
+  # no 502 o corpo nao chega em $_.ErrorDetails; e preciso ler o stream da resposta
+  $r = $_.Exception.Response
+  $corpo = (New-Object IO.StreamReader($r.GetResponseStream())).ReadToEnd()
+  "HTTP $([int]$r.StatusCode) -> $corpo"
 }
 Invoke-RestMethod -Uri "http://localhost:4145/contas/0" -Headers $h          # saldo depois: caiu e nao voltou
 ```
@@ -169,9 +176,13 @@ Se preferir provar pelo terminal:
 ```powershell
 Get-Date
 Invoke-RestMethod -Uri "http://localhost:4145/contas/0" -Headers $h
-$hIdem = $h + @{ "Idempotency-Key" = "demo-1" }
-Invoke-RestMethod -Uri "http://localhost:4145/transferencias" -Method Post -Headers $hIdem -ContentType "application/json" -Body '{"idOrigem":0,"idDestino":3,"valor":5}'
-Invoke-RestMethod -Uri "http://localhost:4145/transferencias" -Method Post -Headers $hIdem -ContentType "application/json" -Body '{"idOrigem":0,"idDestino":3,"valor":5}' -ResponseHeadersVariable cab
-$cab["Idempotency-Replayed"]
+$hIdem = $h.Clone(); $hIdem["Idempotency-Key"] = "transferencia-demo-1"
+$corpo = '{"idOrigem":0,"idDestino":3,"valor":5}'
+# Invoke-WebRequest (e nao Invoke-RestMethod) porque so ele expoe os cabecalhos da resposta
+# no Windows PowerShell 5.1 - o parametro -ResponseHeadersVariable so existe do PowerShell 7 em diante
+$r1 = Invoke-WebRequest -Uri "http://localhost:4145/transferencias" -Method Post -Headers $hIdem -ContentType "application/json" -Body $corpo -UseBasicParsing
+"1a chamada -> HTTP $($r1.StatusCode) | Idempotency-Replayed: [$($r1.Headers['Idempotency-Replayed'])] | $($r1.Content)"
+$r2 = Invoke-WebRequest -Uri "http://localhost:4145/transferencias" -Method Post -Headers $hIdem -ContentType "application/json" -Body $corpo -UseBasicParsing
+"2a chamada -> HTTP $($r2.StatusCode) | Idempotency-Replayed: [$($r2.Headers['Idempotency-Replayed'])] | $($r2.Content)"
 Invoke-RestMethod -Uri "http://localhost:4145/contas/0" -Headers $h          # caiu apenas 5, nao 10
 ```
