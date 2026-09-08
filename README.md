@@ -8,9 +8,8 @@ de contas. O projeto evolui ao longo de 4 sprints; este repositorio esta no **Sp
 
 ## Video de apresentacao
 
-<!-- Cole aqui a URL do video (YouTube nao listado, Google Drive com link publico, ou similar) -->
-
-**Link:** _(a preencher)_
+**Arquivo:** [`evidencias/video/video.mp4`](evidencias/video/video.mp4)
+(clique em *View raw* / *Download* para assistir)
 
 Conteudo: funcionalidades do sistema em execucao (particionamento, relogio de Lamport,
 transferencias local e entre agencias, falha conhecida, autenticacao JWT, frontend e
