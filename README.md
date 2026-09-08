@@ -45,7 +45,7 @@ cd agencia
 mvn -q clean package -DskipTests
 ```
 
-Subir as 3 agencias, cada uma em um terminal do PowerShell:
+Subir as 3 agencias, cada uma em um terminal do PowerShell (a partir da raiz do repositorio):
 
 ```powershell
 # Terminal 1
@@ -56,6 +56,13 @@ cd agencia; $env:AGENCIA_ID=1; mvn spring-boot:run
 
 # Terminal 3
 cd agencia; $env:AGENCIA_ID=2; mvn spring-boot:run
+```
+
+Alternativa mais silenciosa (usa o jar ja empacotado, sem o ruido do Maven na saida - foi assim
+que as evidencias em `evidencias/sprint1/` foram geradas):
+
+```powershell
+cd agencia; $env:AGENCIA_ID=0; java -jar target\iceibank-agencia-1.0.0.jar
 ```
 
 Frontend (quarto terminal):
