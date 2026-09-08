@@ -6,6 +6,16 @@ Banco simplificado dividido em agencias, onde cada agencia e uma particao indepe
 de contas. O projeto evolui ao longo de 4 sprints; este repositorio esta no **Sprint 1**
 (U2 - Desenvolvimento Web: arquitetura MVC, servicos REST e relogio logico de Lamport).
 
+## Video de apresentacao
+
+<!-- Cole aqui a URL do video (YouTube nao listado, Google Drive com link publico, ou similar) -->
+
+**Link:** _(a preencher)_
+
+Conteudo: funcionalidades do sistema em execucao (particionamento, relogio de Lamport,
+transferencias local e entre agencias, falha conhecida, autenticacao JWT, frontend e
+idempotencia) e as principais decisoes de projeto.
+
 ## Stack
 
 | Camada | Tecnologia |
