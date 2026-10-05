@@ -14,10 +14,6 @@ final class TokenDeTeste {
         return comToken(jwtService.gerarTokenDeUsuario("ana"));
     }
 
-    static RequestPostProcessor deServico(JwtService jwtService, int idAgencia) {
-        return comToken(jwtService.gerarTokenDeServico(idAgencia));
-    }
-
     private static RequestPostProcessor comToken(String token) {
         return requisicao -> {
             requisicao.addHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token);

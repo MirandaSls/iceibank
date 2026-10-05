@@ -24,8 +24,8 @@ class RegistroEventosTest {
     void gravaUmaLinhaJsonPorEvento(@TempDir Path pastaDados) throws IOException {
         RegistroEventos registro = new RegistroEventos("agencia-0", pastaDados);
 
-        registro.registrar("CRIAR_CONTA", 1, Map.of("id", 0, "nomeAluno", "Ana"));
-        registro.registrar("DEPOSITO", 2, Map.of("id", 0, "valor", 25));
+        registro.registrar("CRIAR_CONTA", new int[] {1, 0, 0}, Map.of("id", 0, "nomeAluno", "Ana"));
+        registro.registrar("DEPOSITO", new int[] {2, 0, 0}, Map.of("id", 0, "valor", 25));
 
         Path arquivo = pastaDados.resolve("eventos-agencia-0.jsonl");
         assertTrue(Files.exists(arquivo));
@@ -36,26 +36,27 @@ class RegistroEventosTest {
         JsonNode primeiro = mapper.readTree(linhas.get(0));
         assertEquals("agencia-0", primeiro.get("agencia").asText());
         assertEquals("CRIAR_CONTA", primeiro.get("tipo").asText());
-        assertEquals(1, primeiro.get("timestampLamport").asInt());
+        assertEquals(1, primeiro.get("timestampVetorial").get(0).asInt());
+        assertEquals(3, primeiro.get("timestampVetorial").size());
         assertEquals("Ana", primeiro.get("detalhes").get("nomeAluno").asText());
         assertTrue(primeiro.hasNonNull("horaParede"));
 
         JsonNode segundo = mapper.readTree(linhas.get(1));
         assertEquals("DEPOSITO", segundo.get("tipo").asText());
-        assertEquals(2, segundo.get("timestampLamport").asInt());
+        assertEquals(2, segundo.get("timestampVetorial").get(0).asInt());
     }
 
     @Test
     @DisplayName("le de volta os eventos ja gravados, para consultas de historico")
     void leOsEventosGravados(@TempDir Path pastaDados) throws IOException {
         RegistroEventos registro = new RegistroEventos("agencia-1", pastaDados);
-        registro.registrar("SAQUE", 7, Map.of("id", 1, "valor", 10));
+        registro.registrar("SAQUE", new int[] {0, 7, 0}, Map.of("id", 1, "valor", 10));
 
         List<RegistroEventos.Evento> eventos = registro.lerEventos();
 
         assertEquals(1, eventos.size());
         assertEquals("SAQUE", eventos.get(0).tipo());
-        assertEquals(7, eventos.get(0).timestampLamport());
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new int[] {0, 7, 0}, eventos.get(0).timestampVetorial());
         assertEquals("agencia-1", eventos.get(0).agencia());
     }
 }

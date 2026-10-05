@@ -13,13 +13,17 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = {
         "iceibank.agencia.id=0",
-        "iceibank.dados.pasta=target/test-data"
+        "iceibank.dados.pasta=target/test-data",
+        "iceibank.mensageria.habilitada=false",
+        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration"
 })
+@Import(MensageriaDeTeste.class)
 @AutoConfigureMockMvc
 class ContasControllerTest {
 
@@ -79,14 +83,14 @@ class ContasControllerTest {
     }
 
     @Test
-    @DisplayName("deposito soma ao saldo e e registrado com timestamp de Lamport")
+    @DisplayName("deposito soma ao saldo e e registrado com timestamp vetorial")
     void depositoAumentaOSaldo() throws Exception {
         mockMvc.perform(post("/contas").contentType(MediaType.APPLICATION_JSON)
                         .with(TokenDeTeste.deUsuario(jwtService))
                         .content("{\"id\":0,\"nomeAluno\":\"Ana\",\"saldoInicial\":100}"))
                 .andExpect(status().isCreated());
 
-        int contadorAntes = estado.relogio().contador();
+        int contadorAntes = estado.relogio().vetor()[0];
 
         mockMvc.perform(post("/contas/0/depositar").contentType(MediaType.APPLICATION_JSON)
                         .with(TokenDeTeste.deUsuario(jwtService))
@@ -94,7 +98,7 @@ class ContasControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.saldo").value(125));
 
-        org.junit.jupiter.api.Assertions.assertEquals(contadorAntes + 1, estado.relogio().contador());
+        org.junit.jupiter.api.Assertions.assertEquals(contadorAntes + 1, estado.relogio().vetor()[0]);
     }
 
     @Test

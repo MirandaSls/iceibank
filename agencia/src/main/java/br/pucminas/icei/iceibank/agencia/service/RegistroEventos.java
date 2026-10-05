@@ -11,6 +11,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,9 +20,9 @@ import java.util.Map;
  * Registra todo evento da agencia em um arquivo {@code .jsonl} (uma linha JSON por evento).
  * Esses arquivos sao a materia-prima da linha do tempo unificada (Parte E).
  *
- * <p>Cada evento guarda dois carimbos de tempo: {@code timestampLamport} (relogio logico, o
- * unico usado para ordenar eventos) e {@code horaParede} (relogio fisico da maquina, apenas
- * para comparacao - nenhuma decisao do sistema depende dele).
+ * <p>Cada evento guarda dois carimbos de tempo: {@code timestampVetorial} (relogio vetorial, o
+ * unico usado para decidir causalidade/concorrencia) e {@code horaParede} (relogio fisico da
+ * maquina, apenas para comparacao - nenhuma decisao do sistema depende dele).
  */
 public class RegistroEventos {
 
@@ -44,8 +45,8 @@ public class RegistroEventos {
         }
     }
 
-    public synchronized Evento registrar(String tipo, int timestampLamport, Map<String, Object> detalhes) {
-        Evento evento = new Evento(nomeAgencia, tipo, timestampLamport, Instant.now().toString(),
+    public synchronized Evento registrar(String tipo, int[] timestampVetorial, Map<String, Object> detalhes) {
+        Evento evento = new Evento(nomeAgencia, tipo, timestampVetorial.clone(), Instant.now().toString(),
                 new LinkedHashMap<>(detalhes));
         try {
             String linha = MAPPER.writeValueAsString(evento) + System.lineSeparator();
@@ -54,7 +55,7 @@ public class RegistroEventos {
         } catch (IOException e) {
             throw new UncheckedIOException("Falha ao registrar evento " + tipo, e);
         }
-        System.out.println("[Lamport " + timestampLamport + "] " + tipo + " " + detalhes);
+        System.out.println("[Vetor " + Arrays.toString(timestampVetorial) + "] " + tipo + " " + detalhes);
         return evento;
     }
 
@@ -83,7 +84,7 @@ public class RegistroEventos {
     public record Evento(
             String agencia,
             String tipo,
-            int timestampLamport,
+            int[] timestampVetorial,
             String horaParede,
             Map<String, Object> detalhes) {
     }

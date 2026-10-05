@@ -15,13 +15,9 @@ import org.springframework.stereotype.Service;
 /**
  * Geracao e validacao dos tokens JWT.
  *
- * <p>Existem dois tipos de token, distinguidos pela claim {@code tipo}:
- *
- * <ul>
- *   <li>{@code USUARIO} - emitido no login, usado pelo frontend nas rotas de conta;</li>
- *   <li>{@code SERVICO} - emitido por uma agencia para falar com outra agencia
- *       ({@code creditar-remoto}). Nao pertence a nenhuma pessoa.</li>
- * </ul>
+ * <p>O token carrega a claim {@code tipo}; hoje so existe {@code USUARIO} (emitido no login,
+ * usado pelo frontend). O tipo {@code SERVICO} do Sprint 1 era usado na chamada REST entre
+ * agencias, que foi substituida por mensageria no Sprint 2.
  *
  * <p>As tres agencias compartilham a mesma chave secreta, logo qualquer uma delas consegue
  * validar a assinatura sem consultar as outras - e justamente essa a vantagem do JWT.
@@ -30,28 +26,20 @@ import org.springframework.stereotype.Service;
 public class JwtService {
 
     public static final String TIPO_USUARIO = "USUARIO";
-    public static final String TIPO_SERVICO = "SERVICO";
     public static final String CLAIM_TIPO = "tipo";
 
     private final SecretKey chave;
     private final Duration validadeDoUsuario;
-    private final Duration validadeDoServico;
 
     public JwtService(
             @Value("${iceibank.jwt.segredo}") String segredo,
-            @Value("${iceibank.jwt.validade-minutos:15}") long validadeMinutos,
-            @Value("${iceibank.jwt.validade-servico-segundos:30}") long validadeServicoSegundos) {
+            @Value("${iceibank.jwt.validade-minutos:15}") long validadeMinutos) {
         this.chave = Keys.hmacShaKeyFor(segredo.getBytes(StandardCharsets.UTF_8));
         this.validadeDoUsuario = Duration.ofMinutes(validadeMinutos);
-        this.validadeDoServico = Duration.ofSeconds(validadeServicoSegundos);
     }
 
     public String gerarTokenDeUsuario(String usuario) {
         return gerarToken(usuario, TIPO_USUARIO, validadeDoUsuario);
-    }
-
-    public String gerarTokenDeServico(int idAgencia) {
-        return gerarToken("agencia-" + idAgencia, TIPO_SERVICO, validadeDoServico);
     }
 
     public String gerarToken(String assunto, String tipo, Duration validade) {

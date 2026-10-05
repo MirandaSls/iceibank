@@ -3,39 +3,33 @@ package br.pucminas.icei.iceibank.agencia.controller;
 import static br.pucminas.icei.iceibank.agencia.controller.ContasController.detalhes;
 
 import br.pucminas.icei.iceibank.agencia.config.ConfigAgencias;
-import br.pucminas.icei.iceibank.agencia.dto.CreditoRemotoRequest;
+import br.pucminas.icei.iceibank.agencia.dto.CreditoMensagem;
 import br.pucminas.icei.iceibank.agencia.dto.Erro;
 import br.pucminas.icei.iceibank.agencia.dto.TransferenciaRequest;
 import br.pucminas.icei.iceibank.agencia.model.Conta;
 import br.pucminas.icei.iceibank.agencia.model.EstadoAgencia;
 import br.pucminas.icei.iceibank.agencia.model.EstadoAgencia.ResultadoTransferencia;
-import br.pucminas.icei.iceibank.agencia.security.JwtService;
+import br.pucminas.icei.iceibank.agencia.mensageria.PublicadorCreditos;
+import br.pucminas.icei.iceibank.agencia.mensageria.PublicadorCreditos.PublicacaoFalhouException;
 import java.util.Map;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
 
 /** Controller das transferencias: dentro da mesma agencia e entre agencias diferentes. */
 @RestController
 public class TransferenciasController {
 
     private final EstadoAgencia estado;
-    private final RestTemplate restTemplate;
-    private final JwtService jwtService;
+    private final PublicadorCreditos publicador;
 
-    public TransferenciasController(EstadoAgencia estado, RestTemplate restTemplate, JwtService jwtService) {
+    public TransferenciasController(EstadoAgencia estado, PublicadorCreditos publicador) {
         this.estado = estado;
-        this.restTemplate = restTemplate;
-        this.jwtService = jwtService;
+        this.publicador = publicador;
     }
 
     /**
@@ -111,21 +105,21 @@ public class TransferenciasController {
         int agenciaDestino = ConfigAgencias.agenciaResponsavel(idDestino);
 
         // O debito e sempre local, pois esta agencia e a dona da conta de origem.
-        int tsDebito = estado.relogio().eventoLocal();
+        int[] tsDebito = estado.relogio().eventoLocal();
         contaOrigem.debitar(requisicao.valor());
         estado.registro().registrar("TRANSFERENCIA_DEBITO", tsDebito, detalhes(
                 "idOrigem", idOrigem, "idDestino", idDestino, "valor", requisicao.valor()));
 
         if (agenciaDestino == estado.idAgencia()) {
             // Caso simples: mesma agencia, credita direto. Nao ha mensagem entre processos, logo
-            // nao se aplicam as regras de envio/recebimento do relogio de Lamport.
+            // nao se aplicam as regras de envio/recebimento do relogio vetorial.
             Conta contaDestino = estado.contas().get(idDestino);
             if (contaDestino == null) {
                 contaOrigem.creditar(requisicao.valor());
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(new Erro("Conta de destino nao encontrada."));
             }
-            int tsCredito = estado.relogio().eventoLocal();
+            int[] tsCredito = estado.relogio().eventoLocal();
             contaDestino.creditar(requisicao.valor());
             estado.registro().registrar("TRANSFERENCIA_CREDITO", tsCredito, detalhes(
                     "idOrigem", idOrigem, "idDestino", idDestino, "valor", requisicao.valor()));
@@ -135,73 +129,35 @@ public class TransferenciasController {
                     "saldoOrigem", contaOrigem.getSaldo()));
         }
 
-        // Caso entre agencias: envia uma mensagem, entao vale a regra 2 do relogio de Lamport.
-        int tsEnvio = estado.relogio().aoEnviar();
-        String urlDestino = ConfigAgencias.urlDaAgencia(agenciaDestino);
-
-        // A chamada entre agencias tambem e autenticada, mas com um token de SERVICO de vida
-        // curta emitido pela propria agencia de origem - nao com o token da pessoa que iniciou
-        // a transferencia (ver justificativa em RESPOSTAS.md).
-        HttpHeaders cabecalhos = new HttpHeaders();
-        cabecalhos.setContentType(MediaType.APPLICATION_JSON);
-        cabecalhos.setBearerAuth(jwtService.gerarTokenDeServico(estado.idAgencia()));
+        // Caso entre agencias: em vez de chamar a outra agencia por HTTP (Sprint 1), publica um
+        // evento no RabbitMQ. Enviar uma mensagem e a regra 2 do relogio vetorial.
+        int[] vetorEnvio = estado.relogio().aoEnviar();
+        String idMensagem = UUID.randomUUID().toString();
 
         try {
-            restTemplate.postForObject(
-                    urlDestino + "/contas/" + idDestino + "/creditar-remoto",
-                    new HttpEntity<>(
-                            new CreditoRemotoRequest(requisicao.valor(), tsEnvio, estado.idAgencia()),
-                            cabecalhos),
-                    String.class);
-
-            estado.registro().registrar("TRANSFERENCIA_ENVIADA", tsEnvio, detalhes(
-                    "idOrigem", idOrigem, "idDestino", idDestino, "valor", requisicao.valor(),
-                    "agenciaDestino", agenciaDestino));
-
-            return ResponseEntity.ok(Map.of(
-                    "mensagem", "Transferencia concluida (entre agencias).",
-                    "saldoOrigem", contaOrigem.getSaldo()));
-        } catch (RestClientException erro) {
-            // LIMITACAO CONHECIDA: se esta chamada falhar, o debito ja aplicado acima NAO e
-            // revertido - o dinheiro desaparece temporariamente. Resolver isso de forma correta
-            // (garantir atomicidade mesmo sob falha) e o assunto do Sprint 4, com uma transacao
-            // distribuida de verdade (2PC/Saga). Por enquanto, so registramos a inconsistencia
-            // no log.
+            publicador.publicar(agenciaDestino, new CreditoMensagem(
+                    idMensagem, idDestino, requisicao.valor(), vetorEnvio, estado.idAgencia(), idOrigem));
+        } catch (PublicacaoFalhouException erro) {
+            // O broker esta inacessivel: sabemos com certeza que a mensagem NAO foi publicada,
+            // entao desfazer o debito local e seguro (diferente do Sprint 1, onde a falha da
+            // chamada REST deixava o destino em estado incerto).
+            contaOrigem.creditar(requisicao.valor());
             estado.registro().registrar("TRANSFERENCIA_FALHOU", estado.relogio().eventoLocal(), detalhes(
                     "idOrigem", idOrigem, "idDestino", idDestino, "valor", requisicao.valor(),
                     "erro", erro.getMessage()));
-
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(new Erro(
-                    "Falha ao contatar agencia de destino. Debito ja aplicado - "
-                            + "inconsistencia conhecida (ver Sprint 4)."));
-        }
-    }
-
-    @PostMapping("/contas/{id}/creditar-remoto")
-    public ResponseEntity<?> creditarRemoto(@PathVariable int id, @RequestBody CreditoRemotoRequest requisicao) {
-        if (requisicao.valor() == null || requisicao.valor().signum() <= 0
-                || requisicao.timestampLamport() == null) {
-            return ResponseEntity.badRequest().body(new Erro("Mensagem de credito remoto invalida."));
+                    "Broker de mensagens indisponivel. Transferencia nao realizada; debito revertido."));
         }
 
-        // Ao RECEBER uma mensagem de outra agencia, o relogio de Lamport e atualizado com base no
-        // timestamp recebido - e a regra 3 do algoritmo.
-        int ts = estado.relogio().aoReceber(requisicao.timestampLamport());
+        estado.registro().registrar("TRANSFERENCIA_ENVIADA", vetorEnvio, detalhes(
+                "idMensagem", idMensagem, "idOrigem", idOrigem, "idDestino", idDestino,
+                "valor", requisicao.valor(), "agenciaDestino", agenciaDestino));
 
-        Conta conta = estado.contas().get(id);
-        if (conta == null) {
-            estado.registro().registrar("CREDITO_REMOTO_RECUSADO", ts, detalhes(
-                    "idConta", id, "valor", requisicao.valor(), "origemAgencia", requisicao.origemAgencia()));
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(new Erro("Conta nao encontrada nesta agencia."));
-        }
-
-        conta.creditar(requisicao.valor());
-        estado.registro().registrar("TRANSFERENCIA_CREDITO_REMOTO", ts, detalhes(
-                "idConta", id, "valor", requisicao.valor(), "origemAgencia", requisicao.origemAgencia()));
-
+        // 200 significa apenas "a mensagem foi publicada": o credito acontece depois, de forma
+        // assincrona, quando a agencia de destino consumir a fila.
         return ResponseEntity.ok(Map.of(
-                "mensagem", "Credito remoto aplicado.",
-                "saldoAtual", conta.getSaldo()));
+                "mensagem", "Transferencia publicada para a agencia de destino (entrega assincrona).",
+                "idMensagem", idMensagem,
+                "saldoOrigem", contaOrigem.getSaldo()));
     }
 }

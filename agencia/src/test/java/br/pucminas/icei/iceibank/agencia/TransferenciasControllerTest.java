@@ -1,16 +1,14 @@
 package br.pucminas.icei.iceibank.agencia;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.hamcrest.Matchers.startsWith;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import br.pucminas.icei.iceibank.agencia.config.ConfigAgencias;
+import br.pucminas.icei.iceibank.agencia.MensageriaDeTeste.PublicadorDeTeste;
+import br.pucminas.icei.iceibank.agencia.MensageriaDeTeste.PublicadorDeTeste.Publicacao;
 import br.pucminas.icei.iceibank.agencia.model.Conta;
 import br.pucminas.icei.iceibank.agencia.model.EstadoAgencia;
 import br.pucminas.icei.iceibank.agencia.security.JwtService;
@@ -23,17 +21,17 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.HttpHeaders;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.client.ResourceAccessException;
-import org.springframework.web.client.RestTemplate;
 
 @SpringBootTest(properties = {
         "iceibank.agencia.id=0",
-        "iceibank.dados.pasta=target/test-data"
+        "iceibank.dados.pasta=target/test-data",
+        "iceibank.mensageria.habilitada=false",
+        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration"
 })
+@Import(MensageriaDeTeste.class)
 @AutoConfigureMockMvc
 class TransferenciasControllerTest {
 
@@ -47,9 +45,7 @@ class TransferenciasControllerTest {
     private JwtService jwtService;
 
     @Autowired
-    private RestTemplate restTemplate;
-
-    private MockRestServiceServer agenciaDeDestino;
+    private PublicadorDeTeste publicador;
 
     @BeforeEach
     void prepararContas() {
@@ -57,7 +53,8 @@ class TransferenciasControllerTest {
         // 0 e 3 pertencem a Agencia 0 (0 % 3 == 0 e 3 % 3 == 0); 1 pertence a Agencia 1.
         estado.contas().put(0, new Conta(0, "Ana", new BigDecimal("100")));
         estado.contas().put(3, new Conta(3, "Carla", new BigDecimal("10")));
-        agenciaDeDestino = MockRestServiceServer.bindTo(restTemplate).build();
+        estado.mensagensProcessadas().clear();
+        publicador.limpar();
     }
 
     @Test
@@ -99,67 +96,63 @@ class TransferenciasControllerTest {
     }
 
     @Test
-    @DisplayName("transferencia entre agencias debita local e envia o timestamp de Lamport na mensagem")
+    @DisplayName("transferencia entre agencias debita local e PUBLICA a mensagem com o vetor de envio")
     void transferenciaEntreAgencias() throws Exception {
-        int contadorAntes = estado.relogio().contador();
-
-        agenciaDeDestino.expect(requestTo(ConfigAgencias.urlDaAgencia(1) + "/contas/1/creditar-remoto"))
-                .andExpect(jsonPath("$.valor").value(30))
-                .andExpect(jsonPath("$.origemAgencia").value(0))
-                // regra 2 de Lamport: o debito consome um tick, o envio consome o seguinte
-                .andExpect(jsonPath("$.timestampLamport").value(contadorAntes + 2))
-                // a chamada entre agencias vai autenticada com um token de servico
-                .andExpect(header(HttpHeaders.AUTHORIZATION, startsWith("Bearer ")))
-                .andRespond(withSuccess("{\"mensagem\":\"Credito remoto aplicado.\"}",
-                        MediaType.APPLICATION_JSON));
+        int[] vetorAntes = estado.relogio().vetor();
 
         mockMvc.perform(post("/transferencias").contentType(MediaType.APPLICATION_JSON)
                         .with(TokenDeTeste.deUsuario(jwtService))
                         .content("{\"idOrigem\":0,\"idDestino\":1,\"valor\":30}"))
                 .andExpect(status().isOk())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
-                        .jsonPath("$.mensagem").value("Transferencia concluida (entre agencias)."));
+                .andExpect(jsonPath("$.mensagem")
+                        .value("Transferencia publicada para a agencia de destino (entrega assincrona)."))
+                .andExpect(jsonPath("$.idMensagem").exists());
 
-        agenciaDeDestino.verify();
         assertEquals(0, new BigDecimal("70").compareTo(estado.contas().get(0).getSaldo()));
+
+        List<Publicacao> publicadas = publicador.publicadas();
+        assertEquals(1, publicadas.size());
+        assertEquals(1, publicadas.get(0).agenciaDestino());
+        assertEquals(1, publicadas.get(0).mensagem().idConta());
+        assertEquals(0, new BigDecimal("30").compareTo(publicadas.get(0).mensagem().valor()));
+        assertEquals(0, publicadas.get(0).mensagem().origemAgencia());
+        // regra 2: o debito consome um tick da posicao 0, o envio consome o seguinte
+        assertArrayEquals(new int[] {vetorAntes[0] + 2, vetorAntes[1], vetorAntes[2]},
+                publicadas.get(0).mensagem().vetorEnvio());
     }
 
     @Test
-    @DisplayName("limitacao conhecida: se a agencia de destino cair, o debito NAO e revertido e a falha e registrada")
-    void limitacaoConhecidaAgenciaDeDestinoForaDoAr() throws Exception {
-        agenciaDeDestino.expect(requestTo(ConfigAgencias.urlDaAgencia(1) + "/contas/1/creditar-remoto"))
-                .andRespond(requisicao -> {
-                    throw new ResourceAccessException("Connection refused");
-                });
+    @DisplayName("o log registra TRANSFERENCIA_ENVIADA com o mesmo vetor e idMensagem da mensagem publicada")
+    void envioFicaRegistradoNoLog() throws Exception {
+        mockMvc.perform(post("/transferencias").contentType(MediaType.APPLICATION_JSON)
+                        .with(TokenDeTeste.deUsuario(jwtService))
+                        .content("{\"idOrigem\":0,\"idDestino\":1,\"valor\":5}"))
+                .andExpect(status().isOk());
+
+        Publicacao publicacao = publicador.publicadas().get(0);
+        List<RegistroEventos.Evento> eventos = estado.registro().lerEventos();
+        RegistroEventos.Evento enviado = eventos.stream()
+                .filter(e -> e.tipo().equals("TRANSFERENCIA_ENVIADA")
+                        && publicacao.mensagem().idMensagem().equals(e.detalhes().get("idMensagem")))
+                .findFirst().orElseThrow();
+        assertArrayEquals(publicacao.mensagem().vetorEnvio(), enviado.timestampVetorial());
+    }
+
+    @Test
+    @DisplayName("se o broker estiver fora do ar a transferencia falha com 502 e o debito e revertido")
+    void brokerForaDoAr() throws Exception {
+        publicador.derrubarBroker();
 
         mockMvc.perform(post("/transferencias").contentType(MediaType.APPLICATION_JSON)
                         .with(TokenDeTeste.deUsuario(jwtService))
                         .content("{\"idOrigem\":0,\"idDestino\":1,\"valor\":30}"))
                 .andExpect(status().isBadGateway())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
-                        .jsonPath("$.erro").exists());
+                .andExpect(jsonPath("$.erro").exists());
 
-        // O dinheiro "some" temporariamente - e exatamente o problema que o Sprint 4 resolve.
-        assertEquals(0, new BigDecimal("70").compareTo(estado.contas().get(0).getSaldo()));
-
-        List<RegistroEventos.Evento> eventos = estado.registro().lerEventos();
-        assertTrue(eventos.stream().anyMatch(evento -> evento.tipo().equals("TRANSFERENCIA_FALHOU")));
-    }
-
-    @Test
-    @DisplayName("credito remoto aplica a regra 3 de Lamport: max(local, recebido) + 1")
-    void creditoRemotoAjustaORelogio() throws Exception {
-        int contadorAntes = estado.relogio().contador();
-        int timestampRecebido = contadorAntes + 40;
-
-        mockMvc.perform(post("/contas/0/creditar-remoto").contentType(MediaType.APPLICATION_JSON)
-                        .with(TokenDeTeste.deServico(jwtService, 1))
-                        .content("{\"valor\":15,\"timestampLamport\":" + timestampRecebido
-                                + ",\"origemAgencia\":1}"))
-                .andExpect(status().isOk())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
-                        .jsonPath("$.saldoAtual").value(115));
-
-        assertEquals(timestampRecebido + 1, estado.relogio().contador());
+        // Sabemos que nada foi publicado, entao devolver o dinheiro e seguro.
+        assertEquals(0, new BigDecimal("100").compareTo(estado.contas().get(0).getSaldo()));
+        assertTrue(publicador.publicadas().isEmpty());
+        assertTrue(estado.registro().lerEventos().stream()
+                .anyMatch(evento -> evento.tipo().equals("TRANSFERENCIA_FALHOU")));
     }
 }

@@ -47,7 +47,7 @@ public class ContasController {
             return ResponseEntity.badRequest().body(new Erro("Saldo inicial nao pode ser negativo."));
         }
 
-        int ts = estado.relogio().eventoLocal();
+        int[] ts = estado.relogio().eventoLocal();
         Conta conta = new Conta(id, requisicao.nomeAluno(), saldoInicial);
         estado.contas().put(id, conta);
         estado.registro().registrar("CRIAR_CONTA", ts, detalhes(
@@ -76,7 +76,7 @@ public class ContasController {
             return contaNaoEncontrada();
         }
 
-        int ts = estado.relogio().eventoLocal();
+        int[] ts = estado.relogio().eventoLocal();
         conta.creditar(requisicao.valor());
         estado.registro().registrar("DEPOSITO", ts, detalhes(
                 "id", id, "valor", requisicao.valor(), "novoSaldo", conta.getSaldo()));
@@ -98,7 +98,7 @@ public class ContasController {
             return ResponseEntity.badRequest().body(new Erro("Saldo insuficiente."));
         }
 
-        int ts = estado.relogio().eventoLocal();
+        int[] ts = estado.relogio().eventoLocal();
         conta.debitar(requisicao.valor());
         estado.registro().registrar("SAQUE", ts, detalhes(
                 "id", id, "valor", requisicao.valor(), "novoSaldo", conta.getSaldo()));
@@ -118,7 +118,7 @@ public class ContasController {
                 .body(new Erro("Conta nao encontrada nesta agencia."));
     }
 
-    static Map<String, Object> detalhes(Object... paresChaveValor) {
+    public static Map<String, Object> detalhes(Object... paresChaveValor) {
         Map<String, Object> mapa = new LinkedHashMap<>();
         for (int i = 0; i < paresChaveValor.length; i += 2) {
             mapa.put(String.valueOf(paresChaveValor[i]), paresChaveValor[i + 1]);

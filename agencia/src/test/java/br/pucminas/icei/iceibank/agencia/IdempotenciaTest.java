@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -24,8 +25,11 @@ import org.springframework.test.web.servlet.MockMvc;
  */
 @SpringBootTest(properties = {
         "iceibank.agencia.id=0",
-        "iceibank.dados.pasta=target/test-data"
+        "iceibank.dados.pasta=target/test-data",
+        "iceibank.mensageria.habilitada=false",
+        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration"
 })
+@Import(MensageriaDeTeste.class)
 @AutoConfigureMockMvc
 class IdempotenciaTest {
 

@@ -19,8 +19,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * Exige um JWT valido em todas as rotas que leem ou modificam contas.
  *
  * <p>Rotas publicas: {@code /auth/login} (onde o token e obtido) e o preflight CORS.
- * A rota interna {@code /contas/{id}/creditar-remoto} so aceita token de servico, emitido por
- * uma agencia para outra - um token de pessoa nao serve ali, e vice-versa.
+ *
+ * <p>No Sprint 2 a rota interna {@code creditar-remoto} deixou de existir: o credito entre
+ * agencias chega pelo RabbitMQ, que nao passa por este filtro (ver RESPOSTAS.md, Parte C).
  */
 @Component
 public class JwtFilter extends OncePerRequestFilter {
@@ -60,11 +61,7 @@ public class JwtFilter extends OncePerRequestFilter {
         }
 
         String tipoDoToken = String.valueOf(claims.get(JwtService.CLAIM_TIPO));
-        String tipoExigido = rotaInternaEntreAgencias(requisicao)
-                ? JwtService.TIPO_SERVICO
-                : JwtService.TIPO_USUARIO;
-
-        if (!tipoExigido.equals(tipoDoToken)) {
+        if (!JwtService.TIPO_USUARIO.equals(tipoDoToken)) {
             recusar(resposta, "Token do tipo " + tipoDoToken + " nao autorizado nesta rota.");
             return;
         }
@@ -78,10 +75,6 @@ public class JwtFilter extends OncePerRequestFilter {
         return HttpMethod.OPTIONS.matches(requisicao.getMethod())
                 || caminho.startsWith("/auth/")
                 || caminho.equals("/error");
-    }
-
-    private boolean rotaInternaEntreAgencias(HttpServletRequest requisicao) {
-        return requisicao.getRequestURI().endsWith("/creditar-remoto");
     }
 
     private void recusar(HttpServletResponse resposta, String mensagem) throws IOException {
