@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import br.pucminas.icei.iceibank.agencia.service.RegistroEventos;
+import br.pucminas.icei.iceibank.agencia.service.RegistroEventos.Evento;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
@@ -15,45 +16,67 @@ import org.junit.jupiter.api.io.TempDir;
 class MesclarLogsTest {
 
     @Test
-    @DisplayName("mescla os logs das 3 agencias em uma unica linha do tempo ordenada por Lamport")
-    void mesclaOrdenandoPorTimestampDeLamport(@TempDir Path pastaDados) throws IOException {
+    @DisplayName("mescla os logs das agencias em uma unica lista com todos os eventos")
+    void mesclaOsLogs(@TempDir Path pastaDados) throws IOException {
         RegistroEventos agencia0 = new RegistroEventos("agencia-0", pastaDados);
         RegistroEventos agencia1 = new RegistroEventos("agencia-1", pastaDados);
 
-        agencia0.registrar("CRIAR_CONTA", 1, Map.of("id", 0));
-        agencia0.registrar("TRANSFERENCIA_DEBITO", 4, Map.of("idOrigem", 0));
-        agencia1.registrar("CRIAR_CONTA", 2, Map.of("id", 1));
-        agencia1.registrar("TRANSFERENCIA_CREDITO_REMOTO", 6, Map.of("idConta", 1));
+        agencia0.registrar("CRIAR_CONTA", new int[] {1, 0, 0}, Map.of("id", 0));
+        agencia1.registrar("CRIAR_CONTA", new int[] {0, 1, 0}, Map.of("id", 1));
 
-        List<RegistroEventos.Evento> linhaDoTempo = MesclarLogs.mesclar(pastaDados);
+        List<Evento> linhaDoTempo = MesclarLogs.mesclar(pastaDados);
 
-        assertEquals(List.of(1, 2, 4, 6), linhaDoTempo.stream()
-                .map(RegistroEventos.Evento::timestampLamport)
-                .toList());
-        assertEquals("agencia-1", linhaDoTempo.get(3).agencia());
+        assertEquals(2, linhaDoTempo.size());
+        assertArrayEquals(new int[] {1, 0, 0}, linhaDoTempo.stream()
+                .filter(e -> e.agencia().equals("agencia-0")).findFirst().orElseThrow().timestampVetorial());
     }
 
     @Test
-    @DisplayName("aponta eventos concorrentes: mesmo timestamp de Lamport em agencias diferentes")
-    void detectaEmpatesEntreAgencias(@TempDir Path pastaDados) throws IOException {
+    @DisplayName("operacoes independentes em agencias diferentes aparecem como CONCORRENTES")
+    void detectaEventosConcorrentes(@TempDir Path pastaDados) throws IOException {
         RegistroEventos agencia0 = new RegistroEventos("agencia-0", pastaDados);
-        RegistroEventos agencia2 = new RegistroEventos("agencia-2", pastaDados);
+        RegistroEventos agencia1 = new RegistroEventos("agencia-1", pastaDados);
 
-        agencia0.registrar("CRIAR_CONTA", 3, Map.of("id", 0));
-        agencia2.registrar("DEPOSITO", 3, Map.of("id", 2));
-        agencia2.registrar("SAQUE", 5, Map.of("id", 2));
+        agencia0.registrar("CRIAR_CONTA", new int[] {1, 0, 0}, Map.of("id", 0));
+        agencia1.registrar("CRIAR_CONTA", new int[] {0, 1, 0}, Map.of("id", 1));
 
-        List<RegistroEventos.Evento> linhaDoTempo = MesclarLogs.mesclar(pastaDados);
-        Map<Integer, List<RegistroEventos.Evento>> empates = MesclarLogs.empatesEntreAgencias(linhaDoTempo);
+        List<Evento[]> concorrentes = MesclarLogs.paresConcorrentes(MesclarLogs.mesclar(pastaDados));
 
-        assertEquals(1, empates.size());
-        assertTrue(empates.containsKey(3));
-        assertEquals(2, empates.get(3).size());
+        assertEquals(1, concorrentes.size());
+    }
+
+    @Test
+    @DisplayName("envio e credito de uma transferencia sao causais: nao aparecem como concorrentes")
+    void transferenciaNaoEhConcorrente(@TempDir Path pastaDados) throws IOException {
+        RegistroEventos agencia0 = new RegistroEventos("agencia-0", pastaDados);
+        RegistroEventos agencia1 = new RegistroEventos("agencia-1", pastaDados);
+
+        agencia0.registrar("TRANSFERENCIA_ENVIADA", new int[] {2, 0, 0}, Map.of("idMensagem", "m1"));
+        agencia1.registrar("TRANSFERENCIA_CREDITO_REMOTO", new int[] {2, 1, 0}, Map.of("idMensagem", "m1"));
+
+        List<Evento> linhaDoTempo = MesclarLogs.mesclar(pastaDados);
+
+        assertTrue(MesclarLogs.paresConcorrentes(linhaDoTempo).isEmpty());
+        assertEquals(1, MesclarLogs.paresCausais(linhaDoTempo).size());
+    }
+
+    @Test
+    @DisplayName("eventos da mesma agencia nunca sao reportados como concorrentes entre si")
+    void mesmaAgenciaNaoConta(@TempDir Path pastaDados) throws IOException {
+        RegistroEventos agencia0 = new RegistroEventos("agencia-0", pastaDados);
+        agencia0.registrar("CRIAR_CONTA", new int[] {1, 0, 0}, Map.of());
+        agencia0.registrar("DEPOSITO", new int[] {2, 0, 0}, Map.of());
+
+        assertTrue(MesclarLogs.paresConcorrentes(MesclarLogs.mesclar(pastaDados)).isEmpty());
     }
 
     @Test
     @DisplayName("pasta de dados vazia gera uma linha do tempo vazia, sem quebrar")
     void pastaVazia(@TempDir Path pastaDados) {
         assertTrue(MesclarLogs.mesclar(pastaDados).isEmpty());
+    }
+
+    private static void assertArrayEquals(int[] esperado, int[] atual) {
+        org.junit.jupiter.api.Assertions.assertArrayEquals(esperado, atual);
     }
 }
