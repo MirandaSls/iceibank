@@ -1,0 +1,26 @@
+# RabbitMQ local do ICEIBank (Sprint 2).
+#   docker compose up -d      sobe o broker
+#   docker compose down       para (as mensagens duraveis ficam no volume)
+#   docker compose down -v    para e apaga o volume (zera filas e mensagens)
+# Painel de administracao: http://localhost:15672  (guest / guest)
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq-iceibank
+    ports:
+      - "5672:5672"     # AMQP (as agencias conectam aqui)
+      - "15672:15672"   # painel web
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq-dados:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
+volumes:
+  rabbitmq-dados:

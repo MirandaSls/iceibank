@@ -57,6 +57,12 @@ $env:RABBITMQ_URL="amqps://usuario:senha@host.cloudamqp.com/vhost"
 $env:RABBITMQ_URL="amqp://guest:guest@localhost:5672"
 ```
 
+RabbitMQ local via Docker (usa o `docker-compose.yml` da raiz):
+
+```powershell
+docker compose up -d
+```
+
 Painel de administracao local: <http://localhost:15672> (guest/guest).
 
 ## Como executar
