@@ -173,14 +173,14 @@ async function enviarTransferencia(botao, { idOrigem, idDestino, valor, chaveIde
       if (erro.status !== 502) {
         throw erro;
       }
-      // Limitacao conhecida do Sprint 1: a agencia de destino caiu depois do debito.
-      // Recarregamos a conta de origem justamente para deixar visivel que o dinheiro
-      // saiu e nao chegou em lugar nenhum.
+      // Sprint 2: o 502 agora significa que o broker (RabbitMQ) esta fora do ar. Nada foi
+      // publicado e o debito foi revertido pela agencia. Recarregamos a conta para mostrar
+      // que o saldo voltou ao valor original.
       tratarErro(erro);
-      const contaDebitada = await api.consultarConta(idOrigem);
-      view.desenharConta(contaDebitada);
+      const contaAtual = await api.consultarConta(idOrigem);
+      view.desenharConta(contaAtual);
       view.registrarNoDiario(
-        `Inconsistencia: conta ${idOrigem} ficou com saldo ${contaDebitada.saldo} e o destino nao recebeu.`,
+        `Transferencia nao realizada: conta ${idOrigem} segue com saldo ${contaAtual.saldo} (debito revertido).`,
         'erro');
       return;
     }

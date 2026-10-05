@@ -488,9 +488,17 @@ Usuários disponíveis: `ana`, `bruno`, `carla` — senha `senha123` para todos.
 
 ## S2.0 Estado da entrega e uso de IA
 
-- **Validado por execução:** 54 testes automatizados passando (`mvn test`), incluindo a topologia do
+- **Validado por execução:** 55 testes automatizados passando (`mvn test`), incluindo a topologia do
   RabbitMQ declarada (exchange topic, filas duráveis, bindings, DLQ), as três regras do relógio
   vetorial, o consumidor de créditos (idempotência, conta inexistente) e o `MesclarLogs`.
+- **Regressão executada (3 agências no ar, sem broker, pelo jar e pelo frontend em
+  `http://localhost:5500`):** rota sem token → 401; login, criar contas nas 3 agências, depósito,
+  saque, transferência local e idempotência (`Idempotency-Replayed: true`) funcionando. Transferência
+  entre agências com o broker fora do ar → **502** "Broker de mensagens indisponível... débito
+  revertido", e o saldo da origem continuou 100 (conferido por API e pela tela, cujo diário
+  também registra a reversão). `MesclarLogs` sobre esses logs reais: 17 eventos, 56 pares
+  concorrentes (ex.: `CRIAR_CONTA [3,0,0]` x `CRIAR_CONTA [0,2,0]`). As agências sobem normalmente
+  sem broker; o consumidor só fica tentando reconectar.
 - **Pendente de execução com broker real:** o teste de resiliência da Parte C (tarefa 3-5) e os
   prints de `evidencias/sprint2/`. O ambiente em que o código foi escrito não tinha RabbitMQ
   nem Docker, então **não há prints nem logs inventados**: o passo a passo para gerá-los está em
