@@ -478,3 +478,113 @@ mvn test
 ```
 
 Usuários disponíveis: `ana`, `bruno`, `carla` — senha `senha123` para todos.
+
+---
+---
+
+# RESPOSTAS — Sprint 2: Mensageria (RabbitMQ) e Relógio Vetorial
+
+**Unidade:** U3 — Comunicação Indireta. Mesma linguagem do Sprint 1 (Java 21 + Spring Boot).
+
+## S2.0 Estado da entrega e uso de IA
+
+- **Validado por execução:** 54 testes automatizados passando (`mvn test`), incluindo a topologia do
+  RabbitMQ declarada (exchange topic, filas duráveis, bindings, DLQ), as três regras do relógio
+  vetorial, o consumidor de créditos (idempotência, conta inexistente) e o `MesclarLogs`.
+- **Pendente de execução com broker real:** o teste de resiliência da Parte C (tarefa 3-5) e os
+  prints de `evidencias/sprint2/`. O ambiente em que o código foi escrito não tinha RabbitMQ
+  nem Docker, então **não há prints nem logs inventados**: o passo a passo para gerá-los está em
+  `evidencias/sprint2/COMO-GERAR.md`. As respostas da Parte C descrevem o comportamento que o
+  código e os testes comprovam; a observação de log real deve ser conferida ao rodar o roteiro.
+- Usei o Claude (Anthropic) para estruturar e escrever código e documentação. Declaro o uso e
+  consigo explicar cada trecho.
+
+## S2.1 Parte A — RabbitMQ (topologia)
+
+Declarada em `MensageriaConfig`: exchange `iceibank.eventos` (topic, durável); filas
+`fila-agencia-0/1/2` (duráveis) ligadas por `agencia.<id>.creditar`; mensagens persistentes.
+Toda agência declara as 3 filas, então uma transferência para agência que nunca subiu fica retida.
+URL do broker em `RABBITMQ_URL` (CloudAMQP ou local).
+
+## S2.2 Funcionalidade adicional — Dead-letter queue (seção 2.1)
+
+**O que faz:** cada fila tem `x-dead-letter-exchange = iceibank.eventos.dlx`. Quando o consumidor
+não consegue aplicar um crédito (conta inexistente, mensagem malformada), rejeita a mensagem
+**sem reenfileirar** (`AmqpRejectAndDontRequeueException`) e ela vai para `fila-agencia-<id>.dlq`.
+Sem isso, o default do Spring AMQP reenfileira e a mensagem voltaria em loop infinito.
+
+**Por que esta:** cobre exatamente o buraco do cenário da Parte C: o crédito para a conta que não
+existe mais deixa de ser descartado em silêncio e fica guardado, inspecionável e reprocessável.
+**Extra relacionado:** cada mensagem tem `idMensagem`; reentregas (at-least-once) são ignoradas
+(`CREDITO_DUPLICADO_IGNORADO`), mesma ideia da idempotência do Sprint 1.
+**Onde:** `MensageriaConfig`, `ConsumidorCreditos`, `ProcessadorCreditos`; testes
+`MensageriaConfigTest` e `ProcessadorCreditosTest`.
+
+## S2.3 Parte B — Relógio vetorial (seção 6.4)
+
+**1. Com 10 agências, o que acontece com o vetor?** Cada mensagem passa a carregar 10 inteiros em
+vez de 3: o custo é O(N) por mensagem e por evento registrado. Com 3 agências é irrelevante; com
+milhares de processos vira problema real (por isso existem variações como vetores esparsos/
+version vectors, ou voltar a Lamport quando a precisão causal não é necessária). Além disso o
+conjunto de processos precisa ser conhecido e fixo.
+
+**2. `[3,1,0]` x `[3,2,0]`:** todas as posições do primeiro são ≤ às do segundo (3≤3, 1≤2, 0≤0) e
+são diferentes, logo o primeiro evento aconteceu **antes** do segundo (teste `v1AntesDeV2`).
+
+**3. `[3,1,0]` x `[1,3,0]`:** na posição 0, 3>1; na posição 1, 1<3. Nenhum é ≤ ao outro, logo são
+**concorrentes** (teste `concorrentes`).
+
+## S2.4 Parte C — Publish/Subscribe (seção 7.5)
+
+**1. O que acontece quando a Agência 1 volta?** A mensagem ficou retida na `fila-agencia-1`
+(durável + persistente), então a mensageria **não falhou**: ao reconectar, o consumidor a recebe
+e aplica `aoReceber` no relógio. O que decide o resultado é a **conta**: as contas vivem só em
+memória; se a agência *reiniciou*, ela voltou vazia, o crédito encontra `contas.get(id) == null`,
+e é registrado `CREDITO_REMOTO_FALHOU` ("conta nao encontrada"). O dinheiro já saiu da origem e
+não entrou em lugar nenhum — mas agora a mensagem vai para a `fila-agencia-1.dlq` em vez de se
+perder (`ProcessadorCreditosTest.contaInexistenteEhRecusada`). Se a agência apenas ficou
+indisponível sem perder memória, o crédito é aplicado normalmente. *(Conferir com o log real ao
+rodar `COMO-GERAR.md`.)*
+
+**2. O que melhorou e o que continua aberto.** Melhorou: a origem não depende mais de o destino
+estar no ar (antes: 502 e débito pendurado), a mensagem sobrevive à indisponibilidade, e se o
+broker estiver fora a transferência falha **antes** do débito definitivo (revertido, pois sabemos
+que nada foi publicado). Continua aberto: "a mensagem não se perde" ≠ "o sistema está correto":
+sem persistência das contas, uma agência que reinicia perde o saldo e não consegue aplicar
+créditos; o `200` da API só significa "publicado", não "creditado"; e não há transação
+distribuída ligando débito e crédito (Sprint 4: 2PC/Saga).
+
+**3. Consumidor sem JWT é problema de segurança?** Sim, é uma superfície real: quem consegue
+publicar na exchange cria dinheiro, e o JWT não protege esse caminho. No ambiente de
+desenvolvimento qualquer processo com a `RABBITMQ_URL` (ou `guest/guest` local) publica; na
+CloudAMQP, quem tiver a URL. A proteção passa a ser a credencial/vhost do broker (usuários
+separados para publicar e consumir, permissões por exchange/fila, TLS `amqps`), e idealmente
+assinar a mensagem (HMAC/JWT no corpo) e validar. Por isso removi a rota REST `creditar-remoto`
+e o token de serviço do Sprint 1: a autenticação entre agências passou a ser a do broker.
+
+## S2.5 Parte D — Linha do tempo causal (seção 8.3)
+
+**1. O que torna a comparação confiável no vetor?** Cada posição conta os eventos de **um**
+processo que influenciaram aquele evento. `V1 ≤ V2` em todas as posições significa que tudo que
+V1 "viu" V2 também viu, ou seja, há um caminho de mensagens de um ao outro. Em Lamport, um número
+só resume tudo, então `L(a) < L(b)` não prova que a causou b. Aqui a relação é "se e somente se".
+
+**2. Par concorrente.** Ex.: `CRIAR_CONTA` na Agência 0 `[1,0,0]` e `CRIAR_CONTA` na Agência 1
+`[0,1,0]`: nenhuma mensagem ligou as duas, então um não pode ter causado o outro (coberto por
+`MesclarLogsTest.detectaEventosConcorrentes`). Já `TRANSFERENCIA_ENVIADA` `[2,0,0]` →
+`TRANSFERENCIA_CREDITO_REMOTO` `[2,1,0]` são causais (ANTES) e não aparecem como concorrentes
+(`transferenciaNaoEhConcorrente`); o script os lista em "pares causais" ligados pelo `idMensagem`.
+
+**3. O(n²) é problema?** Sim com milhões de eventos. Dá para: comparar só eventos candidatos
+(janela de tempo de parede, ou por conta/agência), indexar por vetor, processar em streaming
+mantendo o "frontier" por agência, usar processamento distribuído (map/reduce) ou limitar a análise
+a eventos de interesse (ex.: só débitos/créditos da mesma conta).
+
+## S2.6 Como reproduzir
+
+```powershell
+cd agencia; mvn clean package               # 54 testes, sem precisar de broker
+$env:RABBITMQ_URL="amqp://guest:guest@localhost:5672"   # ou a URL do CloudAMQP
+$env:AGENCIA_ID=0; mvn spring-boot:run      # idem 1 e 2, um terminal cada
+mvn -q compile exec:java "-Dexec.mainClass=br.pucminas.icei.iceibank.agencia.MesclarLogs"
+```

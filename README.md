@@ -3,8 +3,10 @@
 Projeto da disciplina **Laboratorio de Desenvolvimento de Aplicacoes Moveis e Distribuidas**.
 
 Banco simplificado dividido em agencias, onde cada agencia e uma particao independente
-de contas. O projeto evolui ao longo de 4 sprints; este repositorio esta no **Sprint 1**
-(U2 - Desenvolvimento Web: arquitetura MVC, servicos REST e relogio logico de Lamport).
+de contas. O projeto evolui ao longo de 4 sprints; este repositorio esta no **Sprint 2**
+(U3 - Comunicacao Indireta: mensageria Publish/Subscribe com RabbitMQ e relogio vetorial).
+O Sprint 1 (REST/MVC, relogio de Lamport, JWT, frontend) continua funcionando e esta documentado
+em `RESPOSTAS.md` (partes 1 a 7).
 
 ## Video de apresentacao
 
@@ -20,6 +22,7 @@ idempotencia) e as principais decisoes de projeto.
 | Camada | Tecnologia |
 |---|---|
 | Backend | Java 21 + Spring Boot 3.4 (Maven) |
+| Mensageria | RabbitMQ (Spring AMQP), exchange topic `iceibank.eventos` |
 | Autenticacao | JWT (jjwt 0.12.6) |
 | Frontend | HTML + CSS + JavaScript puro (sem framework) |
 
@@ -29,9 +32,32 @@ idempotencia) e as principais decisoes de projeto.
 iceibank/
 |-- agencia/          servico REST de uma agencia (mesmo codigo, 3 execucoes)
 |-- frontend/         interface web que consome a API
-|-- evidencias/       prints de teste do sprint
+|-- evidencias/       prints de teste (sprint1/, sprint2/)
 |-- RESPOSTAS.md      respostas das questoes do roteiro
 ```
+
+## Sprint 2 - Mensageria e relogio vetorial
+
+- A transferencia entre agencias deixou de ser uma chamada REST: a agencia de origem **publica**
+  um evento em `iceibank.eventos` (routing key `agencia.<id>.creditar`) e a de destino o consome
+  da sua fila duravel `fila-agencia-<id>`, mesmo que estivesse fora do ar na hora.
+- O relogio de Lamport foi substituido por um **relogio vetorial** (um contador por agencia).
+- `MesclarLogs` agora lista os pares de eventos **comprovadamente concorrentes**.
+- Funcionalidade adicional: **dead-letter queue** (`fila-agencia-<id>.dlq`) para creditos que a
+  agencia nao consegue aplicar (ex.: conta inexistente).
+
+### RabbitMQ
+
+Defina `RABBITMQ_URL` antes de subir cada agencia. Sem a variavel, usa `amqp://guest:guest@localhost:5672`.
+
+```powershell
+# CloudAMQP (AMQP URL do painel da instancia)
+$env:RABBITMQ_URL="amqps://usuario:senha@host.cloudamqp.com/vhost"
+# ou RabbitMQ local
+$env:RABBITMQ_URL="amqp://guest:guest@localhost:5672"
+```
+
+Painel de administracao local: <http://localhost:15672> (guest/guest).
 
 ## Como executar
 
@@ -71,7 +97,7 @@ Alternativa mais silenciosa (usa o jar ja empacotado, sem o ruido do Maven na sa
 que as evidencias em `evidencias/sprint1/` foram geradas):
 
 ```powershell
-cd agencia; $env:AGENCIA_ID=0; java -jar target\iceibank-agencia-1.0.0.jar
+cd agencia; $env:AGENCIA_ID=0; java -jar target\iceibank-agencia-2.0.0.jar
 ```
 
 Frontend (quarto terminal):
