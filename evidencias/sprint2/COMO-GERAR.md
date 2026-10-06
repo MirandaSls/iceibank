@@ -29,7 +29,7 @@ Invoke-RestMethod -Uri "http://localhost:4146/contas/1" -Headers $h
 ## 2. `resiliencia-fila.png`
 1. Feche o terminal da Agência 1. 2. Repita a transferência: a resposta continua 200. 3. No
 RabbitMQ Manager, veja 1 mensagem em `fila-agencia-1`. 4. Suba a Agência 1 de novo e observe o log:
-- **Sem ter reiniciado a memória** não é possível (fechar o processo apaga as contas): ao voltar,
+- Fechar o processo apaga as contas (estão em memória): ao voltar,
   a conta 1 não existe, aparece `CREDITO_REMOTO_FALHOU (conta nao encontrada)` e a mensagem vai
   para `fila-agencia-1.dlq` (veja no Manager). Anote isso na resposta 1 da Parte C.
 

@@ -499,11 +499,12 @@ Usuários disponíveis: `ana`, `bruno`, `carla` — senha `senha123` para todos.
   também registra a reversão). `MesclarLogs` sobre esses logs reais: 17 eventos, 56 pares
   concorrentes (ex.: `CRIAR_CONTA [3,0,0]` x `CRIAR_CONTA [0,2,0]`). As agências sobem normalmente
   sem broker; o consumidor só fica tentando reconectar.
-- **Pendente de execução com broker real:** o teste de resiliência da Parte C (tarefa 3-5) e os
-  prints de `evidencias/sprint2/`. O ambiente em que o código foi escrito não tinha RabbitMQ
-  nem Docker, então **não há prints nem logs inventados**: o passo a passo para gerá-los está em
-  `evidencias/sprint2/COMO-GERAR.md`. As respostas da Parte C descrevem o comportamento que o
-  código e os testes comprovam; a observação de log real deve ser conferida ao rodar o roteiro.
+- **Executado com broker real** (CloudAMQP/LavinMQ, `amqps`, 3 agências): transferência assíncrona
+  0→1 (conta 1 passou de 0 a 30), resiliência com a Agência 1 derrubada, DLQ e `MesclarLogs`
+  causal. Saídas em `evidencias/sprint2/execucao-real.txt`. Transferência entre agências pela tela
+  (frontend) também confirmada (conta 0: 55, conta 1: 5).
+- **Pendente:** apenas os **prints** (`png`) de `evidencias/sprint2/`, a serem tirados da mesma execução
+  seguindo `COMO-GERAR.md`.
 - Usei o Claude (Anthropic) para estruturar e escrever código e documentação. Declaro o uso e
   consigo explicar cada trecho.
 
@@ -551,8 +552,12 @@ memória; se a agência *reiniciou*, ela voltou vazia, o crédito encontra `cont
 e é registrado `CREDITO_REMOTO_FALHOU` ("conta nao encontrada"). O dinheiro já saiu da origem e
 não entrou em lugar nenhum — mas agora a mensagem vai para a `fila-agencia-1.dlq` em vez de se
 perder (`ProcessadorCreditosTest.contaInexistenteEhRecusada`). Se a agência apenas ficou
-indisponível sem perder memória, o crédito é aplicado normalmente. *(Conferir com o log real ao
-rodar `COMO-GERAR.md`.)*
+indisponível sem perder memória, o crédito é aplicado normalmente.
+**Observado na execução real:** com a Agência 1 derrubada, a transferência de 10 devolveu `200` e a
+`fila-agencia-1` passou a ter 1 mensagem retida. Ao subir a Agência 1 de novo (processo novo, sem
+contas), a mensagem foi entregue (fila → 0), o log registrou `CREDITO_REMOTO_FALHOU` ("conta nao
+encontrada", vetor `[6,1,0]`) e a `fila-agencia-1.dlq` ficou com 1 mensagem; `GET /contas/1` → 404.
+Ou seja, a mensageria não falhou: o crédito é que não teve onde ser aplicado.
 
 **2. O que melhorou e o que continua aberto.** Melhorou: a origem não depende mais de o destino
 estar no ar (antes: 502 e débito pendurado), a mensagem sobrevive à indisponibilidade, e se o

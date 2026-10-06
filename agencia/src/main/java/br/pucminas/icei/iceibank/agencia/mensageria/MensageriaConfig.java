@@ -13,6 +13,8 @@ import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -82,6 +84,23 @@ public class MensageriaConfig {
             itens.add(ligacaoMortas);
         }
         return new Declarables(itens);
+    }
+
+    /**
+     * Conecta pela URL AMQP completa ({@code amqp://} local ou {@code amqps://} do CloudAMQP, com
+     * TLS). O Spring Boot 3.4 nao tem uma propriedade que aceite a URL inteira (e ignora
+     * {@code spring.rabbitmq.uri}), entao a fabrica de conexoes e montada aqui.
+     */
+    @Bean
+    public CachingConnectionFactory connectionFactory(@Value("${iceibank.rabbitmq.url}") String url) {
+        com.rabbitmq.client.ConnectionFactory fabrica = new com.rabbitmq.client.ConnectionFactory();
+        try {
+            fabrica.setUri(url);
+        } catch (Exception erro) {
+            throw new IllegalStateException("RABBITMQ_URL invalida (nao e uma URL AMQP).");
+        }
+        fabrica.setConnectionTimeout(3000);
+        return new CachingConnectionFactory(fabrica);
     }
 
     /** Corpo das mensagens em JSON (legivel no RabbitMQ Manager, ao contrario de Java serializado). */

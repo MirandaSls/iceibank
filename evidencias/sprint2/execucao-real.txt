@@ -1,0 +1,24 @@
+EXECUCAO REAL - Sprint 2 (05/10/2026, ~21:09 -03) - 3 agencias + broker CloudAMQP (LavinMQ, amqps/TLS)
+Saidas copiadas do terminal. Credenciais omitidas. Nao substitui os prints (png) exigidos pelo roteiro.
+
+== 1) Transferencia 0->1 (30) com todas as agencias no ar
+POST /transferencias -> {"mensagem":"Transferencia publicada para a agencia de destino (entrega assincrona).","saldoOrigem":70}
+saldo conta 0 (Ag0): 70   |   saldo conta 1 (Ag1): 30   (credito aplicado de forma assincrona)
+
+== 2) Resiliencia: Agencia 1 derrubada, transferencia 0->1 (10)
+POST /transferencias -> 200 {"mensagem":"Transferencia publicada ... (entrega assincrona).","saldoOrigem":60}
+Filas apos publicar (API de gerenciamento): fila-agencia-1 = 1 mensagem retida; DLQs = 0
+
+== 3) Agencia 1 volta (processo novo, memoria vazia)
+GET /contas/1 -> 404 "Conta nao encontrada nesta agencia."
+Filas: fila-agencia-1 = 0 ; fila-agencia-1.dlq = 1   (mensagem entregue, recusada e movida para a DLQ)
+Log da Ag1: CREDITO_REMOTO_FALHOU vetor [6,1,0] motivo "conta nao encontrada" idMensagem e44dc405-...
+
+== 4) MesclarLogs sobre os logs reais
+[agencia-0] vetor=[4,0,0] TRANSFERENCIA_ENVIADA  ->  [agencia-1] vetor=[4,2,0] TRANSFERENCIA_CREDITO_REMOTO  (ANTES)
+Concorrentes: CRIAR_CONTA [2,0,0] (Ag0) x CRIAR_CONTA [0,1,0] (Ag1) ; CRIAR_CONTA [0,1,0] x CRIAR_CONTA [0,0,1] (Ag2) ; ...
+Total: 10 eventos, 1 par causal, 17 pares concorrentes. O par envio->credito NAO aparece entre os concorrentes.
+
+== 5) Frontend (navegador, http://localhost:5500) com o broker no ar
+Login na Ag0, conta 0 com saldo 60, transferencia de 5 para a conta 1 (Ag1) -> "Transferencia publicada para a
+agencia de destino (entrega assincrona)". Saldos finais: conta 0 = 55 (Ag0), conta 1 = 5 (Ag1).
