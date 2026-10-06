@@ -118,7 +118,7 @@ transferências, `PublicadorRabbit`, RabbitMQ (exchange topic + filas por agênc
 **Como demonstrar que funciona:**
 - 55 testes automatizados: relógio vetorial (3 regras), topologia, consumidor (idempotência, conta
   ausente), fluxo causal sem broker (`FluxoCausalTest`) e `MesclarLogs`.
-- Execução com broker (roteiro em `evidencias/sprint2/COMO-GERAR.md`): transferência assíncrona,
+- Execução com broker (saídas em `evidencias/sprint2/execucao-real.txt`): transferência assíncrona,
   agência de destino fora do ar com a mensagem retida na fila, e linha do tempo causal com pares
   concorrentes e causais.
 - O que **continua aberto**: sem persistência de contas, reiniciar a agência perde saldo; atomicidade

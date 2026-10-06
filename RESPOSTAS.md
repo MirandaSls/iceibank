@@ -506,7 +506,7 @@ Usuários disponíveis: `ana`, `bruno`, `carla` — senha `senha123` para todos.
 - **Evidências em imagem** (`evidencias/sprint2/*.png`): geradas a partir da saída **real** copiada do
   terminal da execução, renderizada em imagem (cada imagem traz esse aviso e a data/hora do `date`).
   **Não são capturas nativas de tela**; se o professor exigir screenshot do terminal/painel, refazer
-  com `COMO-GERAR.md` (o painel do broker só abre com o login da instância).
+  a captura (o painel do broker só abre com o login da instância).
 - Usei o Claude (Anthropic) para estruturar e escrever código e documentação. Declaro o uso e
   consigo explicar cada trecho.
 
