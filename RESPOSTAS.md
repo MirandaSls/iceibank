@@ -503,10 +503,13 @@ Usuários disponíveis: `ana`, `bruno`, `carla` — senha `senha123` para todos.
   0→1 (conta 1 passou de 0 a 30), resiliência com a Agência 1 derrubada, DLQ e `MesclarLogs`
   causal. Saídas em `evidencias/sprint2/execucao-real.txt`. Transferência entre agências pela tela
   (frontend) também confirmada (conta 0: 55, conta 1: 5).
-- **Evidências em imagem** (`evidencias/sprint2/*.png`): geradas a partir da saída **real** copiada do
-  terminal da execução, renderizada em imagem (cada imagem traz esse aviso e a data/hora do `date`).
-  **Não são capturas nativas de tela**; se o professor exigir screenshot do terminal/painel, refazer
-  a captura (o painel do broker só abre com o login da instância).
+- **Evidências** (`evidencias/sprint2/*.png`): capturas reais de tela da execução de 05/10/2026
+  (Terminal do macOS com `date` visível e painel LavinMQ Manager do CloudAMQP):
+  `transferencia-assincrona.png` (3 agências + transferência 0→1, saldos 70 e 30),
+  `resiliencia-fila.png` (Agência 1 parada, `fila-agencia-1` com 1 mensagem retida e 0 consumidores),
+  `dead-letter-queue.png` (`fila-agencia-1.dlq` com 2 mensagens após `Conta 1 nao encontrada`) e
+  `linha-do-tempo-causal.png` (`MesclarLogs`: 2 pares causais e 26 concorrentes).
+  `execucao-real.txt` guarda a saída de texto de uma execução anterior, equivalente.
 - Usei o Claude (Anthropic) para estruturar e escrever código e documentação. Declaro o uso e
   consigo explicar cada trecho.
 
