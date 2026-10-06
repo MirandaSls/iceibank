@@ -503,8 +503,10 @@ Usuários disponíveis: `ana`, `bruno`, `carla` — senha `senha123` para todos.
   0→1 (conta 1 passou de 0 a 30), resiliência com a Agência 1 derrubada, DLQ e `MesclarLogs`
   causal. Saídas em `evidencias/sprint2/execucao-real.txt`. Transferência entre agências pela tela
   (frontend) também confirmada (conta 0: 55, conta 1: 5).
-- **Pendente:** apenas os **prints** (`png`) de `evidencias/sprint2/`, a serem tirados da mesma execução
-  seguindo `COMO-GERAR.md`.
+- **Evidências em imagem** (`evidencias/sprint2/*.png`): geradas a partir da saída **real** copiada do
+  terminal da execução, renderizada em imagem (cada imagem traz esse aviso e a data/hora do `date`).
+  **Não são capturas nativas de tela**; se o professor exigir screenshot do terminal/painel, refazer
+  com `COMO-GERAR.md` (o painel do broker só abre com o login da instância).
 - Usei o Claude (Anthropic) para estruturar e escrever código e documentação. Declaro o uso e
   consigo explicar cada trecho.
 
