@@ -121,3 +121,10 @@ Linha do tempo unificada (Parte E), com as agencias ja tendo gerado eventos:
 cd agencia
 mvn -q compile exec:java "-Dexec.mainClass=br.pucminas.icei.iceibank.agencia.MesclarLogs"
 ```
+
+Historico de liderancas (Sprint 3, Parte C), depois da eleicao e do failover:
+
+```powershell
+cd agencia
+mvn -q compile exec:java "-Dexec.mainClass=br.pucminas.icei.iceibank.agencia.HistoricoLideranca"
+```
