@@ -22,6 +22,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
  *
  * <p>No Sprint 2 a rota interna {@code creditar-remoto} deixou de existir: o credito entre
  * agencias chega pelo RabbitMQ, que nao passa por este filtro (ver RESPOSTAS.md, Parte C).
+ *
+ * <p>No Sprint 3 as rotas {@code /bully/**} tambem ficam publicas: eleicao e coordenador sao
+ * trocadas entre agencias, que nao tem login de usuario, e o app mobile consulta
+ * {@code GET /bully/lider} antes de qualquer login. O preco e que qualquer um na rede pode
+ * forjar uma mensagem de coordenador e se anunciar lider (discutido na pergunta 5.5).
  */
 @Component
 public class JwtFilter extends OncePerRequestFilter {
@@ -74,6 +79,7 @@ public class JwtFilter extends OncePerRequestFilter {
         String caminho = requisicao.getRequestURI();
         return HttpMethod.OPTIONS.matches(requisicao.getMethod())
                 || caminho.startsWith("/auth/")
+                || caminho.startsWith("/bully/")
                 || caminho.equals("/error");
     }
 

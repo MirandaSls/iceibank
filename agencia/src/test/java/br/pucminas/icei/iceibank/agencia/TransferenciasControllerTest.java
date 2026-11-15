@@ -29,6 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
         "iceibank.agencia.id=0",
         "iceibank.dados.pasta=target/test-data",
         "iceibank.mensageria.habilitada=false",
+        "iceibank.bully.habilitado=false",
         "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration"
 })
 @Import(MensageriaDeTeste.class)
