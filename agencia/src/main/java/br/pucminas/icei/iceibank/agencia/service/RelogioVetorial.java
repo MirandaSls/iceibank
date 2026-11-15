@@ -1,5 +1,9 @@
 package br.pucminas.icei.iceibank.agencia.service;
 
+import br.pucminas.icei.iceibank.agencia.service.ComparadorVetorial.Relacao;
+import java.util.function.BiFunction;
+import java.util.function.Supplier;
+
 /**
  * Relogio vetorial (Fidge/Mattern, 1988). Um vetor de contadores, uma posicao por agencia,
  * com tres regras:
@@ -55,5 +59,23 @@ public class RelogioVetorial {
     /** Copia do vetor atual, sem registrar nenhum evento. */
     public synchronized int[] vetor() {
         return vetor.clone();
+    }
+
+    /**
+     * Roda {@code seIgual} so se o vetor atual for IGUAL a {@code esperado}; senao chama
+     * {@code seDiferente} com a relacao (esperado x atual) e uma copia do vetor atual.
+     * {@code seIgual} pode chamar {@link #eventoLocal()} (o lock e reentrante).
+     */
+    public synchronized <T> T executarSeIgual(
+            int[] esperado, Supplier<T> seIgual, BiFunction<Relacao, int[], T> seDiferente) {
+        if (esperado == null || esperado.length != vetor.length) {
+            throw new IllegalArgumentException("Vetor esperado tem tamanho diferente do vetor local.");
+        }
+        // Comparar e aplicar sob o mesmo lock: senao um evento entre os dois passos passaria sem conflito.
+        Relacao relacao = ComparadorVetorial.comparar(esperado, vetor);
+        if (relacao != Relacao.IGUAIS) {
+            return seDiferente.apply(relacao, vetor.clone());
+        }
+        return seIgual.get();
     }
 }

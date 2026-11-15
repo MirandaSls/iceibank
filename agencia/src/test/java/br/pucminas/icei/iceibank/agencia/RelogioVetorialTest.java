@@ -100,4 +100,60 @@ class RelogioVetorialTest {
     void iguais() {
         assertEquals(Relacao.IGUAIS, ComparadorVetorial.comparar(new int[] {1, 2, 3}, new int[] {1, 2, 3}));
     }
+
+    @Test
+    @DisplayName("executarSeIgual roda a acao quando o vetor esperado e o atual")
+    void executarSeIgualRodaAcaoQuandoIgual() {
+        RelogioVetorial relogio = new RelogioVetorial(0, 3);
+        relogio.eventoLocal();
+        int[] resultado = relogio.executarSeIgual(new int[] {1, 0, 0},
+                relogio::eventoLocal, (relacao, atual) -> null);
+        assertArrayEquals(new int[] {2, 0, 0}, resultado);
+    }
+
+    @Test
+    @DisplayName("executarSeIgual devolve relacao e vetor atual sem avancar o relogio quando difere")
+    void executarSeIgualRecusaQuandoDiferente() {
+        RelogioVetorial relogio = new RelogioVetorial(0, 3);
+        relogio.eventoLocal();
+        relogio.eventoLocal();
+        String resultado = relogio.executarSeIgual(new int[] {1, 0, 0},
+                () -> "aplicou", (relacao, atual) -> relacao + java.util.Arrays.toString(atual));
+        assertEquals("ANTES[2, 0, 0]", resultado);
+        assertArrayEquals(new int[] {2, 0, 0}, relogio.vetor());
+    }
+
+    @Test
+    @DisplayName("executarSeIgual e atomico: com o mesmo vetor esperado, so uma thread aplica")
+    void executarSeIgualEhAtomico() throws Exception {
+        RelogioVetorial relogio = new RelogioVetorial(0, 3);
+        int[] esperado = relogio.vetor();
+        int threads = 16;
+        java.util.concurrent.CountDownLatch largada = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicInteger aplicadas = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(threads);
+        for (int i = 0; i < threads; i++) {
+            pool.submit(() -> {
+                largada.await();
+                return relogio.executarSeIgual(esperado, () -> {
+                    Thread.yield();
+                    relogio.eventoLocal();
+                    return aplicadas.incrementAndGet();
+                }, (relacao, atual) -> 0);
+            });
+        }
+        largada.countDown();
+        pool.shutdown();
+        pool.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS);
+        assertEquals(1, aplicadas.get());
+        assertArrayEquals(new int[] {1, 0, 0}, relogio.vetor());
+    }
+
+    @Test
+    @DisplayName("executarSeIgual recusa vetor esperado de tamanho errado")
+    void executarSeIgualRecusaTamanhoErrado() {
+        RelogioVetorial relogio = new RelogioVetorial(0, 3);
+        assertThrows(IllegalArgumentException.class,
+                () -> relogio.executarSeIgual(new int[] {0}, () -> 1, (relacao, atual) -> 0));
+    }
 }
