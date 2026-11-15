@@ -1,8 +1,10 @@
 package br.pucminas.icei.iceibank.agencia.controller;
 
 import br.pucminas.icei.iceibank.agencia.config.ConfigAgencias;
+import br.pucminas.icei.iceibank.agencia.dto.ContaComVetor;
 import br.pucminas.icei.iceibank.agencia.dto.CriarContaRequest;
 import br.pucminas.icei.iceibank.agencia.dto.Erro;
+import br.pucminas.icei.iceibank.agencia.dto.SincronizacaoRequest;
 import br.pucminas.icei.iceibank.agencia.dto.ValorRequest;
 import br.pucminas.icei.iceibank.agencia.model.Conta;
 import br.pucminas.icei.iceibank.agencia.model.EstadoAgencia;
@@ -18,10 +20,16 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Controller do CRUD de contas: criar, consultar saldo, depositar e sacar. */
+/**
+ * Controller do CRUD de contas: criar, consultar saldo, depositar, sacar e sincronizar
+ * operacoes feitas offline pelo app (Sprint 3, Parte E).
+ */
 @RestController
 @RequestMapping("/contas")
 public class ContasController {
+
+    private static final String TIPO_DEPOSITO = "DEPOSITO";
+    private static final String TIPO_SAQUE = "SAQUE";
 
     private final EstadoAgencia estado;
 
@@ -62,7 +70,7 @@ public class ContasController {
         if (conta == null) {
             return contaNaoEncontrada();
         }
-        return ResponseEntity.ok(conta);
+        return ResponseEntity.ok(ContaComVetor.de(conta, estado.relogio().vetor()));
     }
 
     @PostMapping("/{id}/depositar")
@@ -81,7 +89,7 @@ public class ContasController {
         estado.registro().registrar("DEPOSITO", ts, detalhes(
                 "id", id, "valor", requisicao.valor(), "novoSaldo", conta.getSaldo()));
 
-        return ResponseEntity.ok(conta);
+        return ResponseEntity.ok(ContaComVetor.de(conta, ts));
     }
 
     @PostMapping("/{id}/sacar")
@@ -103,7 +111,56 @@ public class ContasController {
         estado.registro().registrar("SAQUE", ts, detalhes(
                 "id", id, "valor", requisicao.valor(), "novoSaldo", conta.getSaldo()));
 
-        return ResponseEntity.ok(conta);
+        return ResponseEntity.ok(ContaComVetor.de(conta, ts));
+    }
+
+    @PostMapping("/{id}/sincronizar")
+    public ResponseEntity<?> sincronizar(@PathVariable int id, @RequestBody SincronizacaoRequest requisicao) {
+        if (requisicao.valor() == null || requisicao.valor().signum() <= 0) {
+            return ResponseEntity.badRequest().body(new Erro("Valor deve ser maior que zero."));
+        }
+        int[] vetorConhecido = requisicao.vetorConhecido();
+        if (vetorConhecido == null || vetorConhecido.length != ConfigAgencias.NUMERO_AGENCIAS) {
+            return ResponseEntity.badRequest().body(new Erro(
+                    "vetorConhecido deve ter " + ConfigAgencias.NUMERO_AGENCIAS + " posicoes."));
+        }
+        String tipo = requisicao.tipo();
+        if (!TIPO_DEPOSITO.equals(tipo) && !TIPO_SAQUE.equals(tipo)) {
+            return ResponseEntity.badRequest().body(new Erro("Tipo de operacao pendente nao suportado."));
+        }
+        Conta conta = estado.contas().get(id);
+        if (conta == null) {
+            return contaNaoEncontrada();
+        }
+
+        BigDecimal valor = requisicao.valor();
+        return estado.relogio().executarSeIgual(vetorConhecido,
+                () -> aplicarOperacaoPendente(conta, tipo, valor),
+                (relacao, vetorAtual) -> {
+                    estado.registro().registrar("SINCRONIZACAO_CONFLITO", vetorAtual, detalhes(
+                            "id", id, "tipo", tipo, "valor", valor, "relacao", relacao.name()));
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(detalhes(
+                            "erro", "Conflito detectado: o estado da conta mudou desde a ultima sincronizacao do app.",
+                            "vetorConhecido", vetorConhecido,
+                            "vetorAtual", vetorAtual,
+                            "relacao", relacao.name(),
+                            "contaAtual", conta));
+                });
+    }
+
+    private ResponseEntity<?> aplicarOperacaoPendente(Conta conta, String tipo, BigDecimal valor) {
+        if (TIPO_SAQUE.equals(tipo) && !conta.temSaldoPara(valor)) {
+            return ResponseEntity.badRequest().body(new Erro("Saldo insuficiente."));
+        }
+        int[] ts = estado.relogio().eventoLocal();
+        if (TIPO_DEPOSITO.equals(tipo)) {
+            conta.creditar(valor);
+        } else {
+            conta.debitar(valor);
+        }
+        estado.registro().registrar("SINCRONIZACAO_OFFLINE", ts, detalhes(
+                "id", conta.getId(), "tipo", tipo, "valor", valor, "novoSaldo", conta.getSaldo()));
+        return ResponseEntity.ok(ContaComVetor.de(conta, ts));
     }
 
     private ResponseEntity<?> validarValor(ValorRequest requisicao) {
