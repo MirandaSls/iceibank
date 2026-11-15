@@ -97,6 +97,58 @@ class BullyServiceTest {
         assertThat(transporte.coordenadoresEnviados()).contains(0);
     }
 
+    @Test
+    @DisplayName("heartbeat com lider fora do ar limpa a lider e elege de novo")
+    void heartbeatLiderMortoReelege() {
+        transporte.vivas(0);
+        criar(1).receberCoordenador(2, new int[] {0, 0, 1});
+
+        bully.verificarLider();
+
+        assertThat(transporte.lideresConsultados()).containsExactly(2);
+        assertThat(tipos()).containsExactly("LIDER_ANUNCIADO", "LIDER_NAO_RESPONDEU", "ELEICAO_INICIADA",
+                "TORNOU_LIDER");
+        RegistroEventos.Evento falha = registro.lerEventos().get(1);
+        assertThat(falha.detalhes()).containsEntry("liderAtual", 2).containsEntry("agencia", 1);
+        assertThat(bully.obterLiderAtual()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("heartbeat com lider no ar nao muda nada")
+    void heartbeatLiderVivo() {
+        transporte.vivas(2);
+        criar(0).receberCoordenador(2, new int[] {0, 0, 1});
+
+        bully.verificarLider();
+
+        assertThat(bully.obterLiderAtual()).isEqualTo(2);
+        assertThat(tipos()).containsExactly("LIDER_ANUNCIADO");
+    }
+
+    @Test
+    @DisplayName("heartbeat quando eu sou a lider nao consulta ninguem")
+    void heartbeatSouLider() {
+        transporte.vivas(0, 1);
+        criar(2).iniciarEleicao();
+        int eventosAntes = tipos().size();
+
+        bully.verificarLider();
+
+        assertThat(transporte.lideresConsultados()).isEmpty();
+        assertThat(transporte.eleicoesEnviadas()).isEmpty();
+        assertThat(tipos()).hasSize(eventosAntes);
+    }
+
+    @Test
+    @DisplayName("heartbeat sem lider conhecida inicia eleicao")
+    void heartbeatSemLiderIniciaEleicao() {
+        transporte.vivas();
+        criar(1).verificarLider();
+
+        assertThat(tipos()).containsExactly("ELEICAO_INICIADA", "TORNOU_LIDER");
+        assertThat(bully.obterLiderAtual()).isEqualTo(1);
+    }
+
     private void esperarLider(Integer esperado) throws InterruptedException {
         long limite = System.currentTimeMillis() + 3000;
         while (!esperado.equals(bully.obterLiderAtual()) && System.currentTimeMillis() < limite) {

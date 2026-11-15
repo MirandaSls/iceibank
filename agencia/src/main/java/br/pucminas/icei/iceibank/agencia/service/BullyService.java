@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +32,7 @@ public class BullyService {
     private final List<Agencia> agencias;
     private final TransporteBully transporte;
     private final boolean habilitado;
+    private final long heartbeatMs;
 
     private final AtomicReference<Integer> liderAtual = new AtomicReference<>();
     private final AtomicBoolean eleicaoEmAndamento = new AtomicBoolean(false);
@@ -43,24 +45,26 @@ public class BullyService {
     @Autowired
     public BullyService(EstadoAgencia estado,
             @Value("${iceibank.bully.timeout-ms:1000}") long timeoutMs,
+            @Value("${iceibank.bully.heartbeat-ms:3000}") long heartbeatMs,
             @Value("${iceibank.bully.habilitado:true}") boolean habilitado) {
         this(estado.idAgencia(), estado.relogio(), estado.registro(), ConfigAgencias.AGENCIAS,
-                new HttpTransporteBully(Duration.ofMillis(timeoutMs)), habilitado);
+                new HttpTransporteBully(Duration.ofMillis(timeoutMs)), habilitado, heartbeatMs);
     }
 
     BullyService(int idAgencia, RelogioVetorial relogio, RegistroEventos registro, List<Agencia> agencias,
             TransporteBully transporte) {
-        this(idAgencia, relogio, registro, agencias, transporte, false);
+        this(idAgencia, relogio, registro, agencias, transporte, false, 0);
     }
 
     private BullyService(int idAgencia, RelogioVetorial relogio, RegistroEventos registro,
-            List<Agencia> agencias, TransporteBully transporte, boolean habilitado) {
+            List<Agencia> agencias, TransporteBully transporte, boolean habilitado, long heartbeatMs) {
         this.idAgencia = idAgencia;
         this.relogio = relogio;
         this.registro = registro;
         this.agencias = agencias;
         this.transporte = transporte;
         this.habilitado = habilitado;
+        this.heartbeatMs = heartbeatMs;
     }
 
     /** So depois do servidor estar escutando: as outras agencias precisam conseguir responder. */
@@ -68,6 +72,36 @@ public class BullyService {
     public void aoSubir() {
         if (habilitado) {
             executor.execute(this::iniciarEleicao);
+            executor.scheduleWithFixedDelay(this::verificarLiderComSeguranca, heartbeatMs, heartbeatMs,
+                    TimeUnit.MILLISECONDS);
+        }
+    }
+
+    /** Uma excecao escapando de uma tarefa agendada cancelaria todos os heartbeats seguintes. */
+    private void verificarLiderComSeguranca() {
+        try {
+            verificarLider();
+        } catch (RuntimeException erro) {
+            System.err.println("[bully] heartbeat falhou: " + erro.getMessage());
+        }
+    }
+
+    public void verificarLider() {
+        Integer lider = liderAtual.get();
+        if (lider == null) {
+            iniciarEleicao();
+            return;
+        }
+        if (lider == idAgencia) {
+            return;
+        }
+        Agencia agenciaLider = agencias.stream().filter(a -> a.id() == lider).findFirst().orElseThrow();
+        if (!transporte.consultarLider(agenciaLider)) {
+            registro.registrar("LIDER_NAO_RESPONDEU", relogio.eventoLocal(),
+                    detalhes("liderAtual", lider, "agencia", idAgencia));
+            // compareAndSet: um anuncio de coordenador pode ter chegado durante a consulta.
+            liderAtual.compareAndSet(lider, null);
+            iniciarEleicao();
         }
     }
 
