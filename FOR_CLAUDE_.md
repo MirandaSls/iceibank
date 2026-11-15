@@ -19,13 +19,14 @@ Por que banco? Porque erro de dinheiro é impossível de esconder. Se um sistema
 erra a ordem de dois eventos, ninguém percebe. Se um banco erra, o saldo não bate e a conta some.
 Lamport usou exatamente esse exemplo no artigo de 1978 que criou o relógio lógico.
 
-O projeto tem 4 sprints. Este repositório está no **Sprint 1**:
+O projeto tem 4 sprints. Este repositório está no **Sprint 3** (os capítulos 2 a 11 contam o
+Sprint 1; o capítulo 12 conta o Sprint 3):
 
 | Sprint | Tecnologia | Conceito distribuído |
 |---|---|---|
-| **1 (aqui)** | REST/MVC + JWT + frontend web | Relógio lógico de Lamport |
+| 1 | REST/MVC + JWT + frontend web | Relógio lógico de Lamport |
 | 2 | Mensageria / Pub-Sub | Relógio vetorial |
-| 3 | Flutter | Consenso (eleição de líder) |
+| **3 (aqui)** | Flutter | Consenso (eleição de líder) |
 | 4 | Containers | Transações distribuídas (2PC/Saga) |
 
 Cada sprint parte do código do anterior. **Não recomeça do zero** — o que estiver mal estruturado
@@ -376,3 +377,209 @@ cd agencia; mvn -q compile exec:java "-Dexec.mainClass=br.pucminas.icei.iceibank
   serviço provavelmente vira credencial do broker.
 - A idempotência já implementada passa a ser essencial: broker com entrega *at-least-once* reentrega
   mensagens, e sem idempotência isso vira dinheiro duplicado.
+
+---
+
+## 12. Sprint 3 — a agência que manda e o celular que não tem rede
+
+Dois assuntos que parecem não ter nada a ver chegam juntos neste sprint: **consenso** (as
+agências passam a escolher uma líder) e **mobile offline-first** (nasce o app Flutter, que precisa
+funcionar no metrô, sem sinal). O fio que costura os dois é o mesmo de sempre: num sistema
+distribuído ninguém tem a visão completa, e cada parte decide com informação incompleta.
+
+### 12.1 Bully: o maior da turma ganha, sempre
+
+A analogia é o recreio. Some o professor, e alguém precisa assumir a fila. A regra combinada é
+brutal e simples: **manda quem tem o maior número de chamada entre os presentes**.
+
+- Quem percebe que não há líder grita "eleição!" só para quem tem número **maior** que o seu.
+- Se ninguém maior responde, ela conclui que é a maior presente: vira líder e avisa todo mundo
+  (`/bully/coordenador`).
+- Se alguém maior responde "tô aqui", quem perguntou fica quieta e espera o anúncio — a maior
+  assumiu a eleição.
+- Quem recebe uma eleição de alguém menor responde (o 200 já é o "tô aqui") e **começa a própria
+  eleição**, porque também é candidata.
+
+No fim, invariavelmente, a líder é a de maior ID ativa. Com 3 agências isso é a Agência 2, ou a 1
+se a 2 cair.
+
+```
+ Agência 0                Agência 1                Agência 2
+     | -- eleicao -------> |                         |
+     | -- eleicao ----------------------------------> |
+     | <------------- 200  |                         |
+     |                     | -- eleicao -----------> |
+     | <------------------------------------ 200 --- |
+     |                     | <--------------- 200 -- |
+     |                     |                         |  ninguém maior: TORNOU_LIDER
+     | <------------------------------ coordenador(2) |
+     |                     | <-------- coordenador(2) |
+  LIDER_ANUNCIADO     LIDER_ANUNCIADO
+```
+
+Em Java isso virou `BullyService` (decisão) + `BullyController` (as três rotas `/bully/*`). As
+chamadas entre agências usam cliente HTTP com timeout, como no Sprint 1, agora governado por
+`ICEIBANK_BULLY_TIMEOUT_MS` (padrão 1000 ms). Cada mensagem carrega o `vetorEnvio`, então os
+eventos de eleição entram no relógio vetorial do Sprint 2 como qualquer outro evento — e por isso
+`HistoricoLideranca` e `MesclarLogs` conseguem ler a eleição do mesmo `.jsonl`.
+
+As rotas `/bully/*` são **públicas** (sem JWT). É conversa entre máquinas, e o painel do app
+consulta a líder independentemente do login. O preço: qualquer um na rede pode disparar uma
+eleição. No laboratório o pior que isso causa é barulho, porque a líder ainda não decide nada; no
+Sprint 4, quando ela coordenar transações, essa porta vai precisar de credencial de serviço.
+
+### 12.2 Heartbeat: "você ainda tá aí?"
+
+Eleger uma vez não basta; a líder pode morrer cinco minutos depois. A cada `ICEIBANK_HEARTBEAT_MS`
+(padrão 3000 ms), cada agência que não é líder faz `GET /bully/lider` na líder que conhece. Se não
+vier resposta dentro do timeout, registra `LIDER_NAO_RESPONDEU`, esquece a líder (`null`) e inicia
+nova eleição. Se a líder é ela mesma, não verifica nada; se não conhece líder nenhuma, elege.
+
+O tempo de detecção, no pior caso, é heartbeat + timeout ≈ 4 s. Diminuir o heartbeat acelera o
+failover e multiplica tráfego; aumentar economiza rede e deixa o sistema "sem cabeça" por mais
+tempo. É o mesmo trade-off do *liveness probe* do Kubernetes — e por isso os dois valores viraram
+variáveis de ambiente em vez de constantes.
+
+### 12.3 Observando: `HistoricoLideranca`
+
+Mesma ideia do `MesclarLogs`: um `main` Java que lê os três `eventos-agencia-N.jsonl`, filtra os
+cinco tipos de evento de eleição (`ELEICAO_INICIADA`, `ELEICAO_RECEBIDA`, `TORNOU_LIDER`,
+`LIDER_ANUNCIADO`, `LIDER_NAO_RESPONDEU`), ordena por hora de parede e imprime a linha do tempo de
+líderes. Ordena pelo relógio de **parede**, e não pelo vetor, de propósito: a pergunta aqui é "o
+que um operador viu acontecer", e boa parte dos eventos de eleição de agências diferentes é
+concorrente — o vetor não daria uma ordem total.
+
+```powershell
+cd agencia
+mvn -q compile exec:java "-Dexec.mainClass=br.pucminas.icei.iceibank.agencia.HistoricoLideranca"
+```
+
+### 12.4 Por que o relógio vetorial resolve o "app offline"
+
+O problema: o celular leu o saldo às 10h (R$ 100), entrou no túnel, registrou um saque de R$ 80 e
+só reconectou às 10h20. Nesse meio tempo alguém pode ter mexido na conta. A agência deve aplicar o
+saque?
+
+Comparar saldo não resolve: se entraram R$ 50 e saíram R$ 50, o saldo é o mesmo e a história é
+outra. Comparar hora não resolve: o relógio do celular mente (e o Sprint 1 inteiro foi sobre isso).
+O que resolve é a pergunta causal: **"a agência viu algum evento que o app não viu?"** — exatamente
+o que o relógio vetorial responde.
+
+1. `GET /contas/{id}` (e `depositar`/`sacar`) passam a devolver `vetorAtual`, lido sem incrementar.
+2. O app guarda esse vetor junto do saldo no cache. É o `vetorConhecido`.
+3. Ao reconectar, cada operação pendente vai para `POST /contas/{id}/sincronizar` com
+   `{tipo, valor, vetorConhecido}`.
+4. A agência compara com o `ComparadorVetorial` do Sprint 2: `IGUAIS` → aplica e devolve 200;
+   qualquer outra relação → **409** com `vetorConhecido`, `vetorAtual`, `relacao` e `contaAtual`.
+
+É o mesmo princípio do `If-Match` / ETag do HTTP e do *optimistic locking* com coluna de versão
+em banco: "aplique só se ninguém mexeu desde que eu li". A agência não resolve o conflito, só o
+**detecta** e devolve a verdade atual — decidir é com o app (ou com a pessoa).
+
+### 12.5 Offline-first no app: fila, otimismo e honestidade
+
+```
+             +------------------- App Flutter -------------------+
+             |                                                   |
+  toque  --> |  tela ----> repositório ----> API http (JWT)  ----+----> agência dona da conta
+             |               |    ^                               |       (id % 3)
+             |               v    |  sem rede / timeout           |
+             |        Hive: cache (saldo + vetorAtual)            |
+             |        Hive: fila de pendentes (+ vetorConhecido)  |
+             |               ^                                    |
+             |  connectivity_plus: "voltou a rede" -> drena fila  |
+             |                                                    |
+             |  polling 3 s ---------------------------------------+--> GET /bully/lider
+             |  painel: líder, agências ativas, histórico          |    nas 3 agências
+             +----------------------------------------------------+
+```
+
+- **Cache local (Hive):** a tela de saldo nunca fica em branco; mostra o último dado conhecido.
+  Hive foi escolhido por ser puro Dart e sem SQL — para guardar "conta → saldo + vetor" e uma
+  lista de pendentes, um banco relacional (sqflite/Drift) seria canhão para matar mosquito.
+- **Fila de pendentes:** depósito ou saque sem conexão não vira erro; vira registro na fila com o
+  `vetorConhecido` daquele momento.
+- **UI otimista com selo:** o saldo exibido já soma a operação, mas marcado como **provisório /
+  pendente**. Em banco isso é perigoso — a pessoa pode achar que tem um dinheiro que ainda não
+  tem — então o app nunca esconde que é provisório, e o saldo real reaparece assim que a agência
+  responde.
+- **Sincronização automática:** o `connectivity_plus` avisa a volta da rede e a fila é drenada sem
+  ninguém tocar em nada.
+- **Conflito visível:** o 409 vira um cartão com a operação recusada e o saldo real, e dois botões:
+  **Reaplicar** (reenvia com o `vetorAtual` devolvido) e **Descartar**. Não há retry automático
+  silencioso de propósito: em dinheiro, quem decide sobre um saque feito "com base num saldo
+  velho" é a pessoa.
+
+O painel de liderança consulta as **três** agências a cada 3 s, não só uma. Isso cumpre o
+requisito "se a consultada não responder, tente outra" e, de brinde, dá a funcionalidade
+adicional do sprint: o **indicador de agências ativas** (quem respondeu na última rodada) e o
+histórico das trocas de líder observadas pelo app.
+
+### 12.6 Pedras no caminho (e as que sabíamos que viriam)
+
+**Tempestade de eleições na subida.** Suba as três quase juntas e você verá mais de um
+`TORNOU_LIDER` antes de estabilizar: a Agência 1 pode se declarar líder porque a 2 ainda nem
+abriu a porta, e meio segundo depois a 2 sobe, faz sua eleição e toma o posto. Não é bug, é o
+algoritmo sem coordenação prévia. Custa mensagens e alguns segundos de liderança trocando de mão.
+Lição: em sistema distribuído, "converge" e "converge sem oscilar" são promessas diferentes.
+
+**Split-brain com rede lenta.** O mesmo timeout de 1 s serve para "a agência morreu" e para "a
+agência demorou". Se a 2 estiver viva mas lenta (GC pausado, rede congestionada), a 1 conclui que
+ela morreu e se declara líder — enquanto a 2 continua se achando líder. Duas cabeças. Bully
+assume rede síncrona (atraso máximo conhecido); a rede real não é. Hoje é inofensivo porque a
+líder não decide nada; no Sprint 4 vai ser preciso algo como época/termo de liderança (o `term`
+do Raft) para que ordens de uma líder antiga sejam recusadas.
+
+**Vetor por agência gera falso conflito.** O vetor é da agência, não da conta. Um depósito na
+conta 6 avança o vetor e invalida o `vetorConhecido` de quem tinha lido a conta 3 — 409 sem
+conflito real. Até uma eleição (evento local) faz isso. É a simplificação do roteiro e falha para
+o lado seguro: recusa a mais, nunca aplica errado. Para precisão por conta, cada conta precisaria
+da própria versão.
+
+**Duas pendentes, um vetor.** Duas operações offline na mesma agência saem da fila com o mesmo
+`vetorConhecido`. A primeira é aplicada — e, ao ser aplicada, ela mesma avança o vetor da agência.
+A segunda chega com o vetor velho e leva 409 por causa da **própria** operação anterior do app. A
+saída é encadear: depois de cada sincronização bem-sucedida, o vetor mais recente daquela agência
+passa a ser o `vetorConhecido` das próximas pendentes, e a fila é drenada em ordem, uma por vez,
+nunca em paralelo. Lição: quando você mesmo é uma das fontes de mudança, precisa se contar na
+história.
+
+**Android bloqueia HTTP puro.** Desde a API 28, `http://` é recusado com "Cleartext HTTP traffic
+not permitted". Solução de laboratório: `android:usesCleartextTraffic="true"` no
+`AndroidManifest.xml` (passo a passo em `app_mobile/README.md`). Em produção, HTTPS. É a lição do
+capítulo 8.1 de novo: a plataforma do cliente tem regras próprias, e funcionar no PowerShell não
+prova nada sobre o celular.
+
+**`localhost` no emulador é o emulador.** O app apontando para `localhost:4145` bate no próprio
+Android, não no PC. O host aparece como `10.0.2.2` — o padrão em `lib/config.dart`. No celular
+físico, `--dart-define=AGENCIA_HOST=<IP do PC>` e regra no Firewall do Windows para 4145-4147. E um
+detalhe que confunde na hora do print: o **modo avião do emulador corta o `10.0.2.2`** também —
+justamente o que se quer para simular offline —, enquanto o PowerShell do host continua alterando
+a conta por fora para provocar o 409.
+
+**Parar a agência não é o mesmo que ficar offline.** Matar o processo simula "agência
+inacessível", mas o estado é em memória: ao voltar, as contas sumiram e o vetor recomeçou do zero.
+A sincronização posterior dá 404, não 200. Para o par de prints offline → sincronizado, use modo
+avião.
+
+### 12.7 Como as peças se ligam
+
+| Peça | Depende de | Usada por |
+|---|---|---|
+| `RelogioVetorial` (Sprint 2) | — | eventos de conta, mensageria, eleição, `/sincronizar` |
+| `ComparadorVetorial` (Sprint 2) | — | `MesclarLogs` e agora `/contas/{id}/sincronizar` |
+| `BullyService` | `ConfigAgencias`, relógio, `RegistroEventos` | `BullyController`, heartbeat agendado |
+| `HistoricoLideranca` | os `.jsonl` | evidências e respostas da Parte C |
+| App Flutter | `/auth/login`, `/contas/*`, `/transferencias`, `/bully/lider` | — |
+
+Comandos e endpoints estão no `README.md` da raiz; o roteiro dos prints, em
+`evidencias/sprint3/COMO-GERAR.md`; a instalação do Flutter, em `app_mobile/README.md`.
+
+### 12.8 O que o Sprint 4 vai cobrar daqui
+
+- A líder deixa de ser enfeite: ela coordena o **2PC** entre agências. Aí o split-brain da 12.6
+  vira problema de dinheiro, e a liderança vai precisar de época/termo.
+- `/bully/*` público vira risco real (quem forja um `coordenador` sequestra a coordenação):
+  credencial de serviço, como a do `creditar-remoto` do Sprint 1.
+- A falha conhecida do capítulo 5 (débito sem crédito) finalmente ganha dono: a transação
+  distribuída coordenada pela líder.
