@@ -322,8 +322,14 @@ Prints extras gerados nessa execução:
 
 | Arquivo | O que mostra |
 |---|---|
-| `app-conflito.png` | card de conflito no app: depósito offline recusado com 409 ao reconectar |
-| `app-reaplicado.png` | após "Reaplicar com saldo atual": operação aplicada, card some, saldo confirmado atualizado |
+| `app-conflito.png` | card de conflito: depósito offline de R$ 15 recusado com 409 porque outro cliente depositou R$ 50 enquanto o app estava offline |
+| `app-reaplicado.png` | após "Reaplicar com saldo atual": operação aplicada (saldo 185), card some |
+
+Todo print do app tem, à direita, uma janela **Monitor** capturada no mesmo instante. Ela mostra
+`Get-Date`, o estado da rede do app (ONLINE/OFFLINE, conforme o proxy) e o `GET /bully/lider` de cada
+agência ("no ar liderAtual = X" ou "FORA DO AR"). Assim o horário e o estado do backend ficam
+visíveis junto com a tela.
 
 Os prints de terminal (1, 2, 3, 6) usam janelas `conhost` separadas por agência, com `Get-Date` no topo.
+`historico-lideranca.png` usa uma janela alta o bastante para mostrar a saída inteira, sem rolagem.
 `eleicao-inicial.png` e `failover.png` juntam numa só imagem a janela de consulta e as janelas das agências.
