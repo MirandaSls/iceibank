@@ -751,10 +751,18 @@ rodada.
 
 ### Prova de funcionamento
 
-> **[CONFIRMAR NA EXECUCAO: print com as 3 agências no ar (3 chips verdes) e outro com a líder
-> derrubada (chip vermelho + nova líder + entrada no histórico). Anotar quantos segundos o chip
-> ficou vermelho antes da líder mudar, e com quais valores de `ICEIBANK_HEARTBEAT_MS` /
-> `ICEIBANK_BULLY_TIMEOUT_MS`.]**
+Execução real em 15/11/2026, com os valores padrão (`ICEIBANK_HEARTBEAT_MS=3000`,
+`ICEIBANK_BULLY_TIMEOUT_MS=1000`) e o app rodando como Flutter Web (ver S3.5):
+
+- `evidencias/sprint3/app-lider-atual.png`: três chips verdes, estrela na Agência 2.
+- Derrubei a Agência 2 às **21:40:23**. No backend, a Agência 1 registrou `LIDER_NAO_RESPONDEU`
+  e `TORNOU_LIDER` às **21:40:26.41** (cerca de 3,4 s depois: um ciclo de heartbeat mais o
+  timeout). O app registrou a troca **"Agência 2 → Agência 1" às 21:40:28**, uns 5 s após a
+  queda, já que o polling de 3 s só percebe a mudança na volta seguinte
+  (`evidencias/sprint3/app-failover.png`: chip da 2 vermelho, estrela na 1).
+- Religuei a Agência 2 às **21:43:33**. Ela subiu, venceu a eleição (`TORNOU_LIDER` às 21:43:38)
+  e o app registrou **"Agência 1 → Agência 2" às 21:43:40**
+  (`evidencias/sprint3/funcionalidade-adicional.png`: três chips verdes e as 3 entradas do histórico).
 
 ---
 
@@ -805,9 +813,29 @@ de ID maior ou igual, e o último a valer é sempre o da agência de maior ID vi
 Seria um bug se o sistema **não** convergisse: duas agências vivas e alcançáveis terminando com
 líderes diferentes, ou uma agência de ID menor sobrepondo a 2 depois que ela já estava no ar.
 
-> **[CONFIRMAR NA EXECUCAO: quantos `TORNOU_LIDER` apareceram na subida e de quais agências (ex.: 0, depois 1, depois 2), copiados da saída do `HistoricoLideranca`]**
+**O que aconteceu na execução real (15/11/2026, 21:32).** As três agências foram iniciadas pelo
+mesmo script, com menos de 1 s entre elas. Por isso o cenário "0 vira líder, depois 1, depois 2"
+não aconteceu: quando a 0 e a 1 iniciaram suas eleições, a 2 já respondia. A subida teve
+**4 `TORNOU_LIDER`, todos da Agência 2**. Ela se declarou de novo a cada `ELEICAO_RECEBIDA`
+(uma da 0 e duas da 1), e as outras receberam o mesmo `LIDER_ANUNCIADO {liderId=2}` quatro vezes.
+Trecho do log (vetores reais, ordenado pela `horaParede`):
 
-> **[CONFIRMAR NA EXECUCAO: colar um trecho curto do log com `ELEICAO_INICIADA` / `ELEICAO_RECEBIDA` / `TORNOU_LIDER` mostrando a tempestade, com os vetores]**
+```text
+00:32:37.800 agencia-1 ELEICAO_INICIADA  [0,1,0]
+00:32:37.934 agencia-0 ELEICAO_INICIADA  [1,0,0]
+00:32:37.970 agencia-2 ELEICAO_INICIADA  [0,0,1]
+00:32:38.075 agencia-2 TORNOU_LIDER      [0,0,2]
+00:32:38.294 agencia-2 ELEICAO_RECEBIDA  [0,2,4]   {de=1}
+00:32:38.403 agencia-1 ELEICAO_RECEBIDA  [2,3,0]   {de=0}
+00:32:38.467 agencia-2 ELEICAO_RECEBIDA  [4,5,6]   {de=0}
+00:32:38.494 agencia-2 TORNOU_LIDER      [4,5,9]
+00:32:38.508 agencia-2 TORNOU_LIDER      [4,5,13]
+00:32:38.523 agencia-2 TORNOU_LIDER      [4,5,17]
+00:32:38.532 agencia-1 LIDER_ANUNCIADO   [4,9,19]  {liderId=2}
+```
+
+(horário UTC no log, 21:32 no horário local. Print: `evidencias/sprint3/eleicao-inicial.png`, com as
+três janelas das agências e as três respostas de `GET /bully/lider` = 2.)
 
 **3. `/bully/eleicao` não tem autenticação. Isso é um problema de segurança real para este
 projeto?**
@@ -901,7 +929,20 @@ de maior ID sempre se impõe (*bully*). Ao voltar, a Agência 2 dispara a eleiç
 `ApplicationReadyEvent`, não tem ninguém acima e se declara líder, mesmo com a Agência 1 liderando
 sem nenhum problema.
 
-> **[CONFIRMAR NA EXECUCAO: ao subir de novo a agência derrubada (passo 6), a liderança voltou para ela? Colar o trecho `TORNOU_LIDER` / `LIDER_ANUNCIADO` correspondente]**
+Na execução real, **voltou sim**, as duas vezes em que religuei a Agência 2. Trecho da segunda
+volta (horário UTC no log, 21:43 local). A Agência 1 liderava sem problema algum e foi destituída
+em ~60 ms:
+
+```text
+00:40:26.413 agencia-1 TORNOU_LIDER     [4,20,19]                 (failover: 2 caiu)
+00:43:38.051 agencia-2 ELEICAO_INICIADA [0,0,1]                   (2 volta, relógio zerado)
+00:43:38.110 agencia-2 TORNOU_LIDER     [0,0,2]
+00:43:38.165 agencia-0 LIDER_ANUNCIADO  [23,21,19] {liderId=2}
+00:43:38.195 agencia-1 LIDER_ANUNCIADO  [4,23,19]  {liderId=2}
+```
+
+Repare também no vetor `[0,0,1]`: a agência que volta perdeu o relógio (está em memória) e
+recomeça do zero, enquanto as outras já estão em `[23,21,19]`.
 
 Problemas práticos, pensando no Sprint 4, em que a líder coordena o 2PC:
 
@@ -982,9 +1023,16 @@ Pelo algoritmo, com as agências subindo na ordem 0 → 1 → 2 e alguns segundo
 esperado são **até 3 declarações e 2 trocas reais** (0 → 1 → 2). Se as três subirem praticamente
 juntas, pode haver uma troca só, ou nenhuma, mas com mais `TORNOU_LIDER` repetidos da 2.
 
-> **[CONFIRMAR NA EXECUCAO: total de `TORNOU_LIDER` e número de trocas reais de liderança na subida, conforme as duas contagens impressas pelo `HistoricoLideranca`]**
+**Na execução real** (`evidencias/sprint3/historico-lideranca.png`), as três subiram juntas, com
+menos de 1 s de diferença. O `HistoricoLideranca` imprimiu **"Total: 5 eventos TORNOU_LIDER, 1
+trocas reais de lider"**. Desses, **4 `TORNOU_LIDER` foram da subida, todos da Agência 2, com 0
+trocas reais**: a primeira declaração define a líder e as outras três são reanúncios. O 5º
+`TORNOU_LIDER` e a única troca real (2 → 1) vieram do failover provocado depois.
 
-> **[CONFIRMAR NA EXECUCAO: tempo aproximado entre o primeiro `ELEICAO_INICIADA` e o último `TORNOU_LIDER` da subida (pela `horaParede`)]**
+O tempo entre o primeiro `ELEICAO_INICIADA` (00:32:37.800, Agência 1) e o último `TORNOU_LIDER`
+(00:32:38.523, Agência 2) foi de **~0,7 s**. Nesse intervalo houve 7 `ELEICAO_INICIADA`,
+4 `ELEICAO_RECEBIDA`, 4 `TORNOU_LIDER` e 8 `LIDER_ANUNCIADO`, ou seja, 23 eventos registrados
+para chegar a um resultado que uma mensagem só resolveria.
 
 **Sim, tem custo**, mesmo com o resultado final certo:
 
@@ -1011,6 +1059,16 @@ relação causal do vetor, que as mensagens do Bully já carregam (`vetorEnvio`)
 ---
 
 ## S3.5 Parte D — App Flutter (seção 8.3)
+
+> **Como as evidências do app foram geradas.** A máquina de entrega não tem Android SDK nem
+> emulador, então o app foi compilado e executado como **Flutter Web** (Flutter 3.50 / Dart 3.14),
+> o mesmo código de `app_mobile/lib`, sem nenhum ramo específico de plataforma:
+> `flutter build web --dart-define=AGENCIA_HOST=localhost --dart-define=PORTA_BASE=5145`.
+> Para simular o "modo avião", o app apontou para um **proxy TCP local** (portas 5145-5147 →
+> 4145-4147). Desligar o proxy derruba a conexão com as três agências de uma vez, sem mexer no
+> backend. O `PORTA_BASE` existe só para isso; sem ele, o app usa 4145 como antes. Detalhes em
+> `evidencias/sprint3/COMO-GERAR.md`. No celular, o `connectivity_plus` também perceberia a volta
+> da rede. Na web, quem detectou a reconexão foi a nova tentativa periódica de 5 s do `ServicoContas`.
 
 ### 1. Como o app decide com que frequência consultar `/bully/lider`? Que trade-off você considerou ao escolher esse intervalo (resposta rápida a mudanças vs. consumo de bateria/rede do celular)?
 
@@ -1122,7 +1180,20 @@ dentro do monitor do relógio**. Sem isso, duas sincronizações com o mesmo `ve
 poderiam passar juntas pelo "IGUAIS" antes que qualquer uma avançasse o vetor (*check-then-act*),
 e as duas operações seriam aplicadas sobre um estado que nenhuma delas viu.
 
-> **[CONFIRMAR NA EXECUCAO: colar a resposta 409 real (com `relacao`, `vetorAtual` e `contaAtual`) e a sincronização seguinte, feita com o `vetorAtual` devolvido, retornando 200]**
+Execução real (`evidencias/sprint3/conflito-sincronizacao.png`, 21:37, Agência 0, conta 6 com
+saldo 100). O "app" leu a conta e guardou `vetorConhecido = [13,14,19]`. Em seguida, outro
+cliente depositou 25 direto na agência, e o vetor foi para `[14,14,19]`. A sincronização do saque
+de 30 com o vetor antigo voltou:
+
+```json
+HTTP 409
+{"erro":"Conflito detectado: o estado da conta mudou desde a ultima sincronizacao do app.",
+ "vetorConhecido":[13,14,19],"vetorAtual":[14,14,19],"relacao":"ANTES",
+ "contaAtual":{"id":6,"nomeAluno":"Ana","saldo":125}}
+```
+
+Reenviando o mesmo saque com `vetorConhecido = [14,14,19]` (o `vetorAtual` devolvido), a resposta
+foi **HTTP 200, saldo 95, vetor `[15,14,19]`**.
 
 **1. Por que comparar o vetor inteiro, e não só verificar se o saldo mudou? O que o vetor detecta
 que a comparação de saldo não detecta?**
@@ -1247,10 +1318,38 @@ eu consideraria o Drift justamente para ter transação.
 
 ### 2. Na tarefa 5, o que exatamente aconteceu na tela do app quando a sincronização foi recusada? Descreva o comportamento que você implementou e explique por que escolheu essa abordagem em vez de outra.
 
-> **[CONFIRMAR NA EXECUCAO: descrever a sequência real observada: valor do depósito offline,
-> saldo provisório mostrado, alteração feita por fora (frontend web ou `Invoke-RestMethod`), e o que
-> a tela mostrou ao reconectar (saldos, texto do card, vetores). Print em
-> `evidencias/sprint3/app-conflito.png` ou equivalente.]**
+**O que aconteceu na execução real (15/11/2026, app como Flutter Web, conta 6 da Agência 0).**
+O conflito apareceu sem que eu precisasse provocá-lo, e de um jeito que mostra bem a simplificação
+discutida na S3.6, pergunta 2:
+
+1. Por volta das 21:40 consultei a conta 6 (saldo **R$ 95,00**). O app guardou o vetor da Agência 0.
+2. Às 21:40:23 derrubei a líder (Agência 2) para o print de failover. A Agência 0 registrou
+   `LIDER_ANUNCIADO {liderId=1}`, e esse evento **avançou o vetor da Agência 0** para `[18,21,19]`.
+   Nenhuma operação tocou a conta 6.
+3. Logo depois desliguei o proxy (modo avião simulado) e depositei **R$ 20,00**. A tela mostrou
+   "Offline - mostrando dados salvos em 21:40", saldo confirmado R$ 95,00 e **saldo provisório
+   R$ 115,00** com o selo "Pendente de sincronização · 1 operação aguardando"
+   (mesma tela de `evidencias/sprint3/app-offline.png`).
+4. Às 21:41:13 religuei o proxy. Em ~1 s o app sincronizou sozinho e recebeu **409**
+   (`SINCRONIZACAO_CONFLITO`, relação `ANTES`). O card vermelho apareceu no topo:
+   *"Conflito na sincronização — conta 6. A operação offline de R$ 20,00 (depósito) não foi
+   aplicada: o saldo da conta mudou enquanto você estava offline. Saldo real: R$ 95,00."*. O saldo
+   provisório sumiu e ficou só o confirmado, R$ 95,00 (`evidencias/sprint3/app-conflito.png`).
+5. Toquei em **"Reaplicar com saldo atual"**. As duas primeiras tentativas deram 409 de novo, porque
+   eu tinha feito login por fora com `curl` para conferir o saldo, e o evento `LOGIN` também avança
+   o vetor da agência. Na terceira, sem interferência, a agência aplicou (`SINCRONIZACAO_OFFLINE`,
+   novo saldo **R$ 115,00**, vetor `[21,21,19]`) e o card sumiu (`evidencias/sprint3/app-reaplicado.png`).
+
+Ou seja: o saldo da conta 6 **não mudou** entre a leitura e a sincronização, mas o vetor da agência
+mudou por causa de eventos do Bully e de logins, e o app tratou isso como conflito. Pela regra da
+Parte E isso está correto (vetor diferente ⇒ 409), mas, do ponto de vista da pessoa usuária, é um
+**falso positivo**. O texto do card ("o saldo da conta mudou") também fica impreciso nesse caso.
+Com vetor por conta (S3.6, pergunta 2), esse 409 não aconteceria.
+
+Depois, num ciclo limpo (sem failover nem login no meio), o fluxo feliz funcionou como esperado:
+depósito offline de R$ 10,00 com saldo provisório R$ 125,00 (`app-offline.png`), proxy religado
+às 21:43:12, e às 21:43:14 a agência registrou `SINCRONIZACAO_OFFLINE` com novo saldo R$ 125,00.
+O app mostrou o saldo confirmado sem nenhuma ação manual (`app-sincronizacao.png`).
 
 Comportamento implementado:
 

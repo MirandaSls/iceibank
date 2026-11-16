@@ -301,3 +301,29 @@ Rode antes de entregar, com as 3 agências e o broker no ar:
   mvn -q compile exec:java "-Dexec.mainClass=br.pucminas.icei.iceibank.agencia.MesclarLogs"
   ```
 - [ ] **Testes automatizados**: `cd agencia; mvn test` e `cd app_mobile; flutter test` verdes.
+
+## Como os prints desta entrega foram gerados (sem emulador Android)
+
+A máquina de entrega não tinha Android SDK, então os prints do app (4, 5, 7, 8, 9) foram feitos com o
+**mesmo código rodando como Flutter Web**, e o "modo avião" foi simulado com um proxy TCP local:
+
+```powershell
+cd app_mobile
+flutter build web --dart-define=AGENCIA_HOST=localhost --dart-define=PORTA_BASE=5145
+# serve build/web em qualquer servidor estatico (ex.: npx http-server build/web -p 8080)
+```
+
+O app passa a falar com as portas 5145-5147. Um proxy TCP simples (Node `net`, ~30 linhas) repassa
+5145-5147 -> 4145-4147. **Fechar o proxy** equivale a tirar a rede do celular: as três agências
+somem para o app, mas o backend segue no ar. **Reabrir o proxy** equivale a reconectar. O
+`ServicoContas` percebe a volta na tentativa periódica de 5 s e sincroniza sozinho.
+
+Prints extras gerados nessa execução:
+
+| Arquivo | O que mostra |
+|---|---|
+| `app-conflito.png` | card de conflito no app: depósito offline recusado com 409 ao reconectar |
+| `app-reaplicado.png` | após "Reaplicar com saldo atual": operação aplicada, card some, saldo confirmado atualizado |
+
+Os prints de terminal (1, 2, 3, 6) usam janelas `conhost` separadas por agência, com `Get-Date` no topo.
+`eleicao-inicial.png` e `failover.png` juntam numa só imagem a janela de consulta e as janelas das agências.
