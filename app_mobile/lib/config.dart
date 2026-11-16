@@ -6,7 +6,9 @@
 const String hostAgencias = String.fromEnvironment('AGENCIA_HOST', defaultValue: '10.0.2.2');
 
 /// Mesma porta base do backend: 4100 + OFFSET (45). Ver RESPOSTAS.md, secao 0.1.
-const int portaBase = 4145;
+/// Sobrescrevivel para apontar o app para um proxy local que simula a perda de conexao
+/// (ver evidencias/sprint3/COMO-GERAR.md): --dart-define=PORTA_BASE=5145
+const int portaBase = int.fromEnvironment('PORTA_BASE', defaultValue: 4145);
 
 const int numeroAgencias = 3;
 

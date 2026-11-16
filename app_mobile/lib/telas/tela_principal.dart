@@ -46,7 +46,7 @@ class TelaPrincipal extends StatefulWidget {
   State<TelaPrincipal> createState() => _TelaPrincipalState();
 }
 
-enum _TipoAlerta { erro, aviso }
+enum _TipoAlerta { erro }
 
 class _Alerta {
   final _TipoAlerta tipo;
