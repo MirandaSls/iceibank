@@ -5,7 +5,7 @@ target/
 !.mvn/wrapper/maven-wrapper.jar
 
 # Logs de execucao das agencias (gerados em tempo de execucao)
-agencia/data/*.jsonl
+01-backend-agencias/data/*.jsonl
 
 # IDE
 .idea/
@@ -21,3 +21,6 @@ desktop.ini
 
 # worktrees locais de agentes
 .claude/
+
+# macOS
+.DS_Store
