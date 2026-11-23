@@ -34,6 +34,7 @@ class _DialogoValor extends StatefulWidget {
   final String? descricao;
   const _DialogoValor({required this.titulo, required this.rotuloConfirmar, this.descricao});
 
+  /// Cria o estado do dialogo de valor.
   @override
   State<_DialogoValor> createState() => _DialogoValorState();
 }
@@ -42,17 +43,20 @@ class _DialogoValorState extends State<_DialogoValor> {
   final _form = GlobalKey<FormState>();
   final _valor = TextEditingController();
 
+  /// Libera o campo de texto ao fechar o dialogo.
   @override
   void dispose() {
     _valor.dispose();
     super.dispose();
   }
 
+  /// Botao confirmar: valida o valor e fecha o dialogo devolvendo o numero.
   void _confirmar() {
     if (!_form.currentState!.validate()) return;
     Navigator.of(context).pop(lerValor(_valor.text));
   }
 
+  /// Desenha o dialogo com o campo de valor e os botoes Cancelar e confirmar.
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -99,6 +103,7 @@ class PedidoTransferencia {
   const PedidoTransferencia(this.idDestino, this.valor);
 }
 
+/// Abre o dialogo de transferencia (destino + valor). Devolve null se a pessoa cancelar.
 Future<PedidoTransferencia?> pedirTransferencia(BuildContext context, {required int idOrigem}) {
   return showDialog<PedidoTransferencia>(
     context: context,
@@ -110,6 +115,7 @@ class _DialogoTransferencia extends StatefulWidget {
   final int idOrigem;
   const _DialogoTransferencia({required this.idOrigem});
 
+  /// Cria o estado do dialogo de transferencia.
   @override
   State<_DialogoTransferencia> createState() => _DialogoTransferenciaState();
 }
@@ -119,6 +125,7 @@ class _DialogoTransferenciaState extends State<_DialogoTransferencia> {
   final _destino = TextEditingController();
   final _valor = TextEditingController();
 
+  /// Libera os campos de texto ao fechar o dialogo.
   @override
   void dispose() {
     _destino.dispose();
@@ -126,6 +133,7 @@ class _DialogoTransferenciaState extends State<_DialogoTransferencia> {
     super.dispose();
   }
 
+  /// Valida a conta de destino: numero valido e diferente da conta de origem.
   String? _validarDestino(String? texto) {
     final erro = validarIdConta(texto);
     if (erro != null) return erro;
@@ -144,6 +152,7 @@ class _DialogoTransferenciaState extends State<_DialogoTransferencia> {
     return 'Transferência entre agências (destino na Agência $agenciaDestino).';
   }
 
+  /// Botao Transferir: valida os campos e fecha devolvendo destino e valor.
   void _confirmar() {
     if (!_form.currentState!.validate()) return;
     Navigator.of(context).pop(
@@ -151,6 +160,7 @@ class _DialogoTransferenciaState extends State<_DialogoTransferencia> {
     );
   }
 
+  /// Desenha o dialogo de transferencia com os campos, a dica local/entre agencias e os botoes.
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -212,6 +222,7 @@ class PedidoNovaConta {
   const PedidoNovaConta(this.id, this.nomeAluno, this.saldoInicial);
 }
 
+/// Abre o dialogo de nova conta (numero, nome e saldo inicial). Devolve null se a pessoa cancelar.
 Future<PedidoNovaConta?> pedirNovaConta(BuildContext context) {
   return showDialog<PedidoNovaConta>(
     context: context,
@@ -222,6 +233,7 @@ Future<PedidoNovaConta?> pedirNovaConta(BuildContext context) {
 class _DialogoNovaConta extends StatefulWidget {
   const _DialogoNovaConta();
 
+  /// Cria o estado do dialogo de nova conta.
   @override
   State<_DialogoNovaConta> createState() => _DialogoNovaContaState();
 }
@@ -232,6 +244,7 @@ class _DialogoNovaContaState extends State<_DialogoNovaConta> {
   final _nome = TextEditingController();
   final _saldo = TextEditingController(text: '0');
 
+  /// Libera os campos de texto ao fechar o dialogo.
   @override
   void dispose() {
     _id.dispose();
@@ -240,6 +253,7 @@ class _DialogoNovaContaState extends State<_DialogoNovaConta> {
     super.dispose();
   }
 
+  /// Botao Criar: valida os campos e fecha devolvendo os dados da conta nova.
   void _confirmar() {
     if (!_form.currentState!.validate()) return;
     Navigator.of(context).pop(
@@ -247,6 +261,7 @@ class _DialogoNovaContaState extends State<_DialogoNovaConta> {
     );
   }
 
+  /// Desenha o dialogo de nova conta com os tres campos e os botoes.
   @override
   Widget build(BuildContext context) {
     final id = lerIdConta(_id.text);

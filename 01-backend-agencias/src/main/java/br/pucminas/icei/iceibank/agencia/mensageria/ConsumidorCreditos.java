@@ -18,10 +18,16 @@ public class ConsumidorCreditos {
 
     private final ProcessadorCreditos processador;
 
+    /** Recebe por injecao o processador que aplica o credito na conta. */
     public ConsumidorCreditos(ProcessadorCreditos processador) {
         this.processador = processador;
     }
 
+    /**
+     * Chamado automaticamente pelo Spring AMQP sempre que chega uma mensagem na fila desta agencia
+     * (fila-agencia-N). Repassa ao ProcessadorCreditos; se o credito for impossivel (ex.: conta
+     * inexistente), rejeita sem reenfileirar e a mensagem vai para a dead-letter queue.
+     */
     @RabbitListener(queues = "fila-agencia-${iceibank.agencia.id}")
     public void aoReceber(CreditoMensagem mensagem) {
         try {

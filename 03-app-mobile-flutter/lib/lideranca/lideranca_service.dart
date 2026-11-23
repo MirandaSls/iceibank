@@ -42,11 +42,13 @@ class LiderancaService extends ChangeNotifier {
   bool _divergencia = false;
   final List<TrocaLideranca> _historico = [];
 
+  /// Id da agencia que o app considera lider agora (null se nenhuma respondeu).
   int? get liderAtual => _liderAtual;
 
   /// id -> respondeu na ultima rodada.
   Map<int, bool> get agenciasAtivas => Map.unmodifiable(_agenciasAtivas);
 
+  /// Quando foi a ultima rodada de consulta.
   DateTime? get ultimaConsulta => _ultimaConsulta;
 
   /// Nenhuma das agencias respondeu na ultima rodada.
@@ -58,19 +60,25 @@ class LiderancaService extends ChangeNotifier {
   /// Mais recente primeiro, no maximo [maxHistorico].
   List<TrocaLideranca> get historico => List.unmodifiable(_historico);
 
+  /// Diz se o polling esta ligado.
   bool get rodando => _timer != null;
 
+  /// Liga o polling: consulta as 3 agencias agora e depois a cada 3 segundos.
   void iniciar() {
     if (_timer != null || _descartado) return;
     _timer = Timer.periodic(_intervalo, (_) => consultarAgora());
     consultarAgora();
   }
 
+  /// Desliga o polling (usado ao sair da conta).
   void parar() {
     _timer?.cancel();
     _timer = null;
   }
 
+  /// Faz uma rodada: pergunta GET /bully/lider as 3 agencias em paralelo, atualiza lider, agencias
+  /// ativas e historico, e avisa a tela. Nao comeca uma rodada nova se a anterior ainda nao
+  /// terminou.
   Future<void> consultarAgora() async {
     // Com rede lenta uma rodada pode durar mais que o intervalo; empilhar rodadas so
     // multiplicaria requisicoes e poderia aplicar resultados fora de ordem.
@@ -86,6 +94,8 @@ class LiderancaService extends ChangeNotifier {
     }
   }
 
+  /// Consulta uma agencia sem deixar o erro escapar: qualquer falha (sem rede, timeout, erro 5xx)
+  /// devolve null, que significa "agencia fora do ar".
   Future<RespostaLider?> _consultarSemFalhar(int idAgencia) async {
     try {
       return await _consultar(idAgencia);
@@ -95,6 +105,9 @@ class LiderancaService extends ChangeNotifier {
     }
   }
 
+  /// Processa as respostas de uma rodada: marca quais agencias responderam (agencias ativas), conta
+  /// os votos de lider, detecta divergencia, escolhe o lider e, se ele mudou, acrescenta uma
+  /// entrada no historico de trocas.
   void _aplicarRodada(List<RespostaLider> respostas) {
     final ativas = {for (final r in respostas) r.idAgencia};
     _agenciasAtivas = {for (final id in idsAgencias) id: ativas.contains(id)};
@@ -140,6 +153,7 @@ class LiderancaService extends ChangeNotifier {
     return candidatos.first;
   }
 
+  /// Ao destruir o servico: marca como descartado e para o polling.
   @override
   void dispose() {
     _descartado = true;

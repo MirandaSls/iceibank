@@ -26,6 +26,10 @@ public class RelogioVetorial {
     private final int idAgencia;
     private final int[] vetor;
 
+    /**
+     * Cria o vetor zerado com uma posicao por agencia e guarda qual posicao pertence a esta
+     * agencia.
+     */
     public RelogioVetorial(int idAgencia, int numeroAgencias) {
         if (idAgencia < 0 || idAgencia >= numeroAgencias) {
             throw new IllegalArgumentException(
@@ -35,16 +39,28 @@ public class RelogioVetorial {
         this.vetor = new int[numeroAgencias];
     }
 
+    /**
+     * Regra 1 (evento local): incrementa a propria posicao do vetor e devolve uma copia. Usado em
+     * deposito, saque, criacao de conta etc.
+     */
     public synchronized int[] eventoLocal() {
         vetor[idAgencia] += 1;
         return vetor.clone();
     }
 
+    /**
+     * Regra 2 (envio de mensagem): incrementa a propria posicao e devolve a copia que vai junto da
+     * mensagem.
+     */
     public synchronized int[] aoEnviar() {
         vetor[idAgencia] += 1;
         return vetor.clone();
     }
 
+    /**
+     * Regra 3 (recebimento): para cada posicao fica o maior valor entre o vetor local e o recebido,
+     * depois incrementa a propria posicao. Garante que o recebimento fica depois do envio.
+     */
     public synchronized int[] aoReceber(int[] vetorRecebido) {
         if (vetorRecebido == null || vetorRecebido.length != vetor.length) {
             throw new IllegalArgumentException("Vetor recebido tem tamanho diferente do vetor local.");

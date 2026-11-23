@@ -27,6 +27,10 @@ public class TransferenciasController {
     private final EstadoAgencia estado;
     private final PublicadorCreditos publicador;
 
+    /**
+     * Recebe o estado da agencia e o publicador de mensagens do RabbitMQ (usado nas transferencias
+     * entre agencias).
+     */
     public TransferenciasController(EstadoAgencia estado, PublicadorCreditos publicador) {
         this.estado = estado;
         this.publicador = publicador;
@@ -75,11 +79,20 @@ public class TransferenciasController {
         }
     }
 
+    /**
+     * Gera uma "impressao digital" do corpo da transferencia (origem|destino|valor). Serve para
+     * saber se uma Idempotency-Key repetida veio com a MESMA transferencia ou com outra.
+     */
     private static String impressaoDigital(TransferenciaRequest requisicao) {
         return requisicao.idOrigem() + "|" + requisicao.idDestino() + "|"
                 + (requisicao.valor() == null ? "null" : requisicao.valor().stripTrailingZeros().toPlainString());
     }
 
+    /**
+     * Executa a transferencia de fato: valida os dados, confere o saldo, debita a origem e, se o
+     * destino for desta agencia, credita direto; se for de outra agencia, publica a mensagem de
+     * credito no RabbitMQ. Se o broker estiver fora, desfaz o debito e responde 502.
+     */
     private ResponseEntity<?> executarTransferencia(TransferenciaRequest requisicao) {
         if (requisicao.idOrigem() == null || requisicao.idDestino() == null
                 || requisicao.valor() == null || requisicao.valor().signum() <= 0) {

@@ -23,6 +23,8 @@ class CartaoConflito extends StatelessWidget {
     required this.aoDescartar,
   });
 
+  /// Desenha o cartao vermelho de conflito: qual operacao nao foi aplicada, o motivo, o saldo real
+  /// e os botoes Descartar e Reaplicar.
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);

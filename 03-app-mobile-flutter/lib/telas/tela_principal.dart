@@ -42,6 +42,7 @@ class TelaPrincipal extends StatefulWidget {
     this.contaInicial,
   });
 
+  /// Cria o estado da tela principal.
   @override
   State<TelaPrincipal> createState() => _TelaPrincipalState();
 }
@@ -61,8 +62,11 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
   bool _ocupado = false;
   _Alerta? _alerta;
 
+  /// Atalho para o servico de contas recebido pelo widget.
   ServicoContas get _servico => widget.servico;
 
+  /// Ao abrir a tela: passa a ouvir o servico de contas e, se havia uma conta consultada antes,
+  /// consulta de novo.
   @override
   void initState() {
     super.initState();
@@ -78,6 +82,7 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
     _aoMudarServico();
   }
 
+  /// Ao fechar a tela: para de ouvir o servico e libera o campo de texto.
   @override
   void dispose() {
     _servico.removeListener(_aoMudarServico);
@@ -97,6 +102,7 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
     });
   }
 
+  /// Mostra uma mensagem rapida (snackbar) no rodape, com icone opcional.
   void _snack(String texto, {IconData? icone}) {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
@@ -125,6 +131,8 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
     if (mounted) setState(() => _alerta = _Alerta(_TipoAlerta.erro, texto));
   }
 
+  /// Botao Consultar: valida o numero digitado e carrega a conta (da agencia, ou do cache se
+  /// estiver sem rede).
   Future<void> _consultar() async {
     final id = lerIdConta(_campoConta.text);
     if (id == null) {
@@ -159,6 +167,7 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
     }
   }
 
+  /// Recarrega a conta em foco (puxar para atualizar e depois de transferencias).
   Future<void> _recarregar() async {
     final id = _contaId;
     if (id == null) return;
@@ -185,6 +194,8 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
     }
   }
 
+  /// Botoes Depositar/Sacar: pede o valor num dialogo e executa. Avisa se foi aplicado online ou
+  /// guardado na fila offline.
   Future<void> _depositarOuSacar({required bool deposito}) async {
     final id = _contaId;
     if (id == null) return;
@@ -212,12 +223,16 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
     });
   }
 
+  /// Bloqueia operacoes que exigem rede (transferir, criar conta) quando o app esta offline,
+  /// mostrando o motivo.
   bool _exigirConexao(String operacao) {
     if (_servico.online) return true;
     setState(() => _alerta = _Alerta(_TipoAlerta.erro, '$operacao $_msgExigeConexao'));
     return false;
   }
 
+  /// Botao Transferir: pede destino e valor, envia a transferencia e recarrega o saldo (mesmo em
+  /// erro, para mostrar o saldo real).
   Future<void> _transferir() async {
     final origem = _contaId;
     if (origem == null || !_exigirConexao('Transferência')) return;
@@ -248,6 +263,7 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
     });
   }
 
+  /// Botao Criar conta: pede os dados, cria na agencia e ja deixa a conta em foco e no cache.
   Future<void> _criarConta() async {
     if (!_exigirConexao('Criar conta')) return;
     final pedido = await pedirNovaConta(context);
@@ -265,6 +281,7 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
     });
   }
 
+  /// Botao Descartar do cartao de conflito: pede confirmacao e remove a operacao da fila.
   Future<void> _descartar(OperacaoPendente op) async {
     final confirmar = await showDialog<bool>(
       context: context,
@@ -290,9 +307,12 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
     await _executar(() => _servico.descartar(op.idLocal));
   }
 
+  /// Botao Reaplicar do cartao de conflito: reenvia a operacao com o vetor atual.
   Future<void> _reaplicar(OperacaoPendente op) =>
       _executar(() => _servico.tentarNovamente(op.idLocal));
 
+  /// Desenha a estrutura da tela: barra superior com usuario e Sair, e o conteudo com puxar-para-
+  /// atualizar.
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -338,6 +358,8 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
     );
   }
 
+  /// Monta o conteudo em ordem: painel da lider, faixa online/offline, cartoes de conflito, alerta,
+  /// campo de consulta, cartao de saldo, botoes de acao e lista de pendentes.
   Widget _conteudo(BuildContext context) {
     final id = _contaId;
     final estado = id == null ? null : _servico.estado(id);
@@ -393,6 +415,7 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
     );
   }
 
+  /// Desenha o campo "Numero da conta" com o botao Consultar.
   Widget _seletorConta() {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -429,8 +452,10 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
     );
   }
 
+  /// Desenha a grade de botoes: Depositar, Sacar, Transferir e Criar conta.
   Widget _acoes({required bool contaSelecionada}) {
     final podeOperar = contaSelecionada && !_ocupado;
+    // Coloca dois botoes lado a lado, dividindo a largura igualmente.
     Widget linha(Widget a, Widget b) => Row(
           children: [
             Expanded(child: a),
@@ -478,6 +503,7 @@ class _FaixaConexao extends StatelessWidget {
 
   const _FaixaConexao({required this.online, required this.sincronizando, required this.estado});
 
+  /// Desenha a faixa de estado da conexao: offline, sincronizando ou mostrando dado do cache.
   @override
   Widget build(BuildContext context) {
     final cores = Theme.of(context).colorScheme;
@@ -531,6 +557,7 @@ class _CaixaAlerta extends StatelessWidget {
   final VoidCallback aoFechar;
   const _CaixaAlerta({required this.alerta, required this.aoFechar});
 
+  /// Desenha a caixa de erro com botao para fechar.
   @override
   Widget build(BuildContext context) {
     final cores = Theme.of(context).colorScheme;
@@ -563,6 +590,7 @@ class _CaixaAlerta extends StatelessWidget {
 class _EstadoVazio extends StatelessWidget {
   const _EstadoVazio();
 
+  /// Desenha a mensagem inicial pedindo para consultar uma conta.
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);

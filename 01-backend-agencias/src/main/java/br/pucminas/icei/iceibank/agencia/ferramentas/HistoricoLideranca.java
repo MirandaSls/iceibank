@@ -30,9 +30,15 @@ public final class HistoricoLideranca {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    /** Construtor privado: a classe e so um programa de linha de comando com metodos estaticos. */
     private HistoricoLideranca() {
     }
 
+    /**
+     * Programa de linha de comando. Le os logs das 3 agencias (pasta data, ou a pasta passada como
+     * argumento), filtra os eventos de eleicao e imprime: todos os eventos de eleicao em ordem de
+     * hora, a linha do tempo de lideres e o total de trocas de lider.
+     */
     public static void main(String[] args) {
         Path pastaDados = Paths.get(args.length > 0 ? args[0] : "data");
 
@@ -88,6 +94,7 @@ public final class HistoricoLideranca {
         return trocas;
     }
 
+    /** Converte o mapa de detalhes de um evento em texto JSON para imprimir no terminal. */
     private static String paraJson(Map<String, Object> detalhes) {
         try {
             return MAPPER.writeValueAsString(detalhes);

@@ -12,6 +12,7 @@ class TelaLogin extends StatefulWidget {
 
   const TelaLogin({super.key, required this.aoEntrar, this.mensagemInicial});
 
+  /// Cria o estado da tela de login.
   @override
   State<TelaLogin> createState() => _TelaLoginState();
 }
@@ -24,12 +25,14 @@ class _TelaLoginState extends State<TelaLogin> {
   bool _senhaVisivel = false;
   String? _erro;
 
+  /// Ao abrir a tela, mostra a mensagem inicial (ex.: "Sessao expirada") se houver.
   @override
   void initState() {
     super.initState();
     _erro = widget.mensagemInicial;
   }
 
+  /// Libera os campos de texto ao fechar a tela.
   @override
   void dispose() {
     _usuario.dispose();
@@ -37,6 +40,8 @@ class _TelaLoginState extends State<TelaLogin> {
     super.dispose();
   }
 
+  /// Botao Entrar: valida o formulario, chama o login e mostra o erro adequado (senha errada, sem
+  /// conexao ou outro).
   Future<void> _entrar() async {
     if (_carregando) return;
     setState(() => _erro = null);
@@ -61,6 +66,8 @@ class _TelaLoginState extends State<TelaLogin> {
     });
   }
 
+  /// Desenha a tela de login: logotipo, campos de usuario e senha (com botao de mostrar senha),
+  /// mensagem de erro e botao Entrar.
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);

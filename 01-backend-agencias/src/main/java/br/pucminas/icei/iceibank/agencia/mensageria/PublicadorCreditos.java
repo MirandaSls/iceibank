@@ -13,6 +13,7 @@ public interface PublicadorCreditos {
     void publicar(int agenciaDestino, CreditoMensagem mensagem);
 
     class PublicacaoFalhouException extends RuntimeException {
+        /** Cria a excecao com a mensagem de erro e a causa original vinda do RabbitMQ. */
         public PublicacaoFalhouException(String mensagem, Throwable causa) {
             super(mensagem, causa);
         }

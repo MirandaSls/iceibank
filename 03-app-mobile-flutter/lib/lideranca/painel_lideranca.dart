@@ -9,6 +9,9 @@ class PainelLideranca extends StatelessWidget {
 
   final LiderancaService servico;
 
+  /// Desenha o painel do topo: titulo com a lider atual (ou "consultando"/"nenhuma respondeu"), um
+  /// chip por agencia (verde ativa, vermelho fora do ar, estrela na lider), hora da ultima
+  /// atualizacao e a lista recolhivel das trocas de lideranca.
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -139,6 +142,7 @@ class PainelLideranca extends StatelessWidget {
     );
   }
 
+  /// Texto de quando foi a ultima consulta: "Atualizado agora" ou "Atualizado ha Ns".
   static String _textoAtualizacao(DateTime? quando) {
     if (quando == null) return 'Aguardando primeira consulta';
     final segundos = DateTime.now().difference(quando).inSeconds;
@@ -160,6 +164,8 @@ class _ChipAgencia extends StatelessWidget {
   final bool lider;
   final bool consultada;
 
+  /// Desenha o chip de uma agencia: icone e texto "ativa" ou "fora do ar", com estrela se for a
+  /// lider.
   @override
   Widget build(BuildContext context) {
     final cores = Theme.of(context).colorScheme;
@@ -210,6 +216,8 @@ class _LinhaTroca extends StatelessWidget {
 
   final TrocaLideranca troca;
 
+  /// Desenha uma linha do historico: hora e "Agencia X -> Agencia Y" (ou "Lider detectada" na
+  /// primeira vez).
   @override
   Widget build(BuildContext context) {
     final de = troca.de;
@@ -235,7 +243,9 @@ class _LinhaTroca extends StatelessWidget {
     );
   }
 
+  /// Formata a hora como HH:MM:SS.
   static String _hora(DateTime t) {
+    // Completa com zero a esquerda: 5 -> "05".
     String dois(int n) => n.toString().padLeft(2, '0');
     return '${dois(t.hour)}:${dois(t.minute)}:${dois(t.second)}';
   }

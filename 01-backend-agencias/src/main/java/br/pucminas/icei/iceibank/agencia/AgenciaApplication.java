@@ -12,6 +12,11 @@ import org.springframework.boot.builder.SpringApplicationBuilder;
 @SpringBootApplication
 public class AgenciaApplication {
 
+    /**
+     * Ponto de entrada da agencia. Le a variavel AGENCIA_ID (0, 1 ou 2), confere se ela existe em
+     * ConfigAgencias, calcula a porta (4145 + id) e sobe o Spring Boot com essas duas
+     * configuracoes.
+     */
     public static void main(String[] args) {
         int idAgencia = Integer.parseInt(System.getenv().getOrDefault("AGENCIA_ID", "0"));
 

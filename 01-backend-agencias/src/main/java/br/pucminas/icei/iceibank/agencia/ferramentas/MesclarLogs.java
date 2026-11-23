@@ -30,9 +30,15 @@ public final class MesclarLogs {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    /** Construtor privado: a classe e so um programa de linha de comando com metodos estaticos. */
     private MesclarLogs() {
     }
 
+    /**
+     * Programa de linha de comando. Le os logs das 3 agencias e imprime tres blocos: a linha do
+     * tempo unificada (ordenada por hora de parede, com o vetor de cada evento), os pares causais
+     * envio -> credito entre agencias e os pares de eventos comprovadamente CONCORRENTES.
+     */
     public static void main(String[] args) {
         Path pastaDados = Paths.get(args.length > 0 ? args[0] : "data");
 
@@ -150,6 +156,7 @@ public final class MesclarLogs {
         return pares;
     }
 
+    /** Converte o mapa de detalhes de um evento em texto JSON para imprimir no terminal. */
     private static String paraJson(Map<String, Object> detalhes) {
         try {
             return MAPPER.writeValueAsString(detalhes);

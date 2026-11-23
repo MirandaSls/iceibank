@@ -23,8 +23,11 @@ class ApiClient {
   String? _token;
   String? _usuario;
 
+  /// Token JWT atual (null se ninguem estiver logado).
   String? get token => _token;
+  /// Nome do usuario logado.
   String? get usuario => _usuario;
+  /// Diz se ha alguem logado (existe token).
   bool get autenticado => _token != null;
 
   /// Chamado quando qualquer rota devolve 401 (token ausente/expirado).
@@ -54,16 +57,19 @@ class ApiClient {
     throw ultimaFalha ?? const SemConexaoException();
   }
 
+  /// Recoloca na memoria o token e o usuario salvos no aparelho (usado ao reabrir o app).
   void restaurarSessao(String token, String usuario) {
     _token = token;
     _usuario = usuario;
   }
 
+  /// Esquece o token e o usuario (logout ou sessao expirada).
   void logout() {
     _token = null;
     _usuario = null;
   }
 
+  /// Cria uma conta (POST /contas) direto na agencia dona dela (id % 3).
   Future<ContaRemota> criarConta(int id, String nomeAluno, double saldoInicial) async {
     final dados = await _chamar(
       agenciaResponsavel(id),
@@ -74,11 +80,14 @@ class ApiClient {
     return ContaRemota.fromJson(dados);
   }
 
+  /// Busca a conta (GET /contas/{id}) na agencia dona dela. A resposta traz o vetorAtual, que o app
+  /// guarda para o modo offline.
   Future<ContaRemota> consultarConta(int idConta) async {
     final dados = await _chamar(agenciaResponsavel(idConta), 'GET', '/contas/$idConta');
     return ContaRemota.fromJson(dados);
   }
 
+  /// Deposita (POST /contas/{id}/depositar) na agencia dona da conta.
   Future<ContaRemota> depositar(int idConta, double valor) async {
     final dados = await _chamar(
       agenciaResponsavel(idConta),
@@ -89,6 +98,7 @@ class ApiClient {
     return ContaRemota.fromJson(dados);
   }
 
+  /// Saca (POST /contas/{id}/sacar) na agencia dona da conta.
   Future<ContaRemota> sacar(int idConta, double valor) async {
     final dados = await _chamar(
       agenciaResponsavel(idConta),
@@ -159,6 +169,10 @@ class ApiClient {
     return RespostaLider.fromJson(dados);
   }
 
+  /// Unico ponto de saida HTTP do app. Monta a URL da agencia, coloca o token no cabecalho
+  /// Authorization, envia com timeout curto e trata o resultado: falha de rede ou timeout vira
+  /// SemConexaoException; 401 encerra a sessao; qualquer outro erro vira ApiException com a
+  /// mensagem do backend.
   Future<Map<String, dynamic>> _chamar(
     int idAgencia,
     String metodo,
@@ -219,12 +233,15 @@ class ApiClient {
     }
   }
 
+  /// Converte uma lista JSON de numeros em List<int> (usado para os vetores).
   List<int> _listaDeInteiros(Object? valor) =>
       valor is List ? valor.map((e) => (e as num).toInt()).toList() : const <int>[];
 
+  /// Texto padrao de erro quando a agencia nao responde.
   String _mensagemSemConexao(int idAgencia) =>
       'Nao foi possivel falar com a Agencia $idAgencia. Ela esta no ar?';
 
+  /// Gera uma chave de idempotencia unica para cada transferencia.
   String _novaChaveDeIdempotencia() =>
       'transf-${DateTime.now().microsecondsSinceEpoch}-'
       '${_aleatorio.nextInt(0x7fffffff).toRadixString(16)}';

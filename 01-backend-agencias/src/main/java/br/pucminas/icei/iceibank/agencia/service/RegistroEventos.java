@@ -31,10 +31,15 @@ public class RegistroEventos {
     private final String nomeAgencia;
     private final Path caminhoArquivo;
 
+    /** Cria o log da agencia na pasta padrao data/. */
     public RegistroEventos(String nomeAgencia) {
         this(nomeAgencia, Paths.get("data"));
     }
 
+    /**
+     * Cria o log da agencia na pasta informada, criando a pasta se ela nao existir. O arquivo fica
+     * em pasta/eventos-agencia-N.jsonl.
+     */
     public RegistroEventos(String nomeAgencia, Path pastaDados) {
         this.nomeAgencia = nomeAgencia;
         this.caminhoArquivo = pastaDados.resolve("eventos-" + nomeAgencia + ".jsonl");
@@ -45,6 +50,11 @@ public class RegistroEventos {
         }
     }
 
+    /**
+     * Grava um evento no fim do arquivo .jsonl (uma linha JSON por evento) com: agencia, tipo,
+     * vetor do relogio, hora de parede e detalhes. Tambem imprime o evento no console. Devolve o
+     * evento gravado.
+     */
     public synchronized Evento registrar(String tipo, int[] timestampVetorial, Map<String, Object> detalhes) {
         Evento evento = new Evento(nomeAgencia, tipo, timestampVetorial.clone(), Instant.now().toString(),
                 new LinkedHashMap<>(detalhes));
@@ -59,6 +69,10 @@ public class RegistroEventos {
         return evento;
     }
 
+    /**
+     * Le todos os eventos ja gravados no arquivo desta agencia. Devolve lista vazia se o arquivo
+     * ainda nao existir.
+     */
     public synchronized List<Evento> lerEventos() {
         if (!Files.exists(caminhoArquivo)) {
             return List.of();
@@ -76,6 +90,7 @@ public class RegistroEventos {
         return eventos;
     }
 
+    /** Devolve o caminho do arquivo .jsonl desta agencia. */
     public Path caminhoArquivo() {
         return caminhoArquivo;
     }

@@ -25,6 +25,10 @@ const CHAVE_AGENCIA = 'iceibank.agencia';
 
 /** Erro de API com o status HTTP preservado, para a View decidir o que mostrar. */
 export class ErroDaApi extends Error {
+  /**
+   * Cria o erro com a mensagem vinda da API e o status HTTP (0 quando nem chegou a falar com a
+   * agencia).
+   */
   constructor(mensagem, status) {
     super(mensagem);
     this.name = 'ErroDaApi';
@@ -33,27 +37,34 @@ export class ErroDaApi extends Error {
 }
 
 export const sessao = {
+  /** Token JWT guardado no localStorage no login (null se ninguem estiver logado). */
   get token() {
     return localStorage.getItem(CHAVE_TOKEN);
   },
+  /** Nome do usuario logado, guardado no localStorage. */
   get usuario() {
     return localStorage.getItem(CHAVE_USUARIO);
   },
+  /** Agencia escolhida como porta de entrada (0 se nenhuma foi escolhida ainda). */
   get idAgencia() {
     return Number(localStorage.getItem(CHAVE_AGENCIA) ?? 0);
   },
+  /** Troca a agencia de entrada e salva no localStorage. */
   set idAgencia(id) {
     localStorage.setItem(CHAVE_AGENCIA, String(id));
   },
+  /** Abre a sessao depois do login: salva token, usuario e agencia no localStorage. */
   abrir(token, usuario, idAgencia) {
     localStorage.setItem(CHAVE_TOKEN, token);
     localStorage.setItem(CHAVE_USUARIO, usuario);
     localStorage.setItem(CHAVE_AGENCIA, String(idAgencia));
   },
+  /** Encerra a sessao (botao Sair ou resposta 401): apaga token e usuario do localStorage. */
   encerrar() {
     localStorage.removeItem(CHAVE_TOKEN);
     localStorage.removeItem(CHAVE_USUARIO);
   },
+  /** Diz se ha alguem logado, ou seja, se existe um token guardado. */
   estaAberta() {
     return Boolean(this.token);
   },
@@ -65,6 +76,7 @@ export const estado = {
   ultimaTransferencia: null,
 };
 
+/** Devolve a URL base da agencia pedida (por padrao, a agencia de entrada da sessao). */
 function urlDaAgencia(idAgencia = sessao.idAgencia) {
   return AGENCIAS[idAgencia].url;
 }
@@ -111,6 +123,9 @@ async function chamar(caminho, { metodo = 'GET', corpo, cabecalhos = {}, idAgenc
 
 /* ------------------------------ operacoes ------------------------------- */
 
+/**
+ * Faz POST /auth/login na agencia escolhida e, se der certo, abre a sessao com o token recebido.
+ */
 export async function login(usuario, senha, idAgencia) {
   const { dados } = await chamar('/auth/login', {
     metodo: 'POST',
@@ -121,6 +136,7 @@ export async function login(usuario, senha, idAgencia) {
   return dados;
 }
 
+/** Cria uma conta (POST /contas) na agencia de entrada e passa a mostrar essa conta na tela. */
 export async function criarConta(id, nomeAluno, saldoInicial) {
   const { dados } = await chamar('/contas', {
     metodo: 'POST',
@@ -130,12 +146,14 @@ export async function criarConta(id, nomeAluno, saldoInicial) {
   return dados;
 }
 
+/** Busca a conta (GET /contas/{id}) na agencia de entrada e guarda como a conta em foco. */
 export async function consultarConta(idConta) {
   const { dados } = await chamar(`/contas/${idConta}`);
   estado.contaEmFoco = dados;
   return dados;
 }
 
+/** Deposita o valor na conta (POST /contas/{id}/depositar) e atualiza a conta em foco. */
 export async function depositar(idConta, valor) {
   const { dados } = await chamar(`/contas/${idConta}/depositar`, {
     metodo: 'POST',
@@ -145,6 +163,7 @@ export async function depositar(idConta, valor) {
   return dados;
 }
 
+/** Saca o valor da conta (POST /contas/{id}/sacar) e atualiza a conta em foco. */
 export async function sacar(idConta, valor) {
   const { dados } = await chamar(`/contas/${idConta}/sacar`, {
     metodo: 'POST',
@@ -178,6 +197,7 @@ export async function transferir({ idOrigem, idDestino, valor, chaveIdempotencia
   };
 }
 
+/** Gera uma chave de idempotencia unica (data + numero aleatorio) para uma nova transferencia. */
 export function novaChaveDeIdempotencia() {
   return `transf-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 }

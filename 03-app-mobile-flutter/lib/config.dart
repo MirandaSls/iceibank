@@ -14,6 +14,7 @@ const int numeroAgencias = 3;
 
 const List<int> idsAgencias = [0, 1, 2];
 
+/// Monta a URL de uma agencia: http://<host>:<4145 + id>. No emulador o host e 10.0.2.2 (o PC).
 String urlDaAgencia(int idAgencia) => 'http://$hostAgencias:${portaBase + idAgencia}';
 
 /// Particionamento: a conta pertence a agencia id % 3.

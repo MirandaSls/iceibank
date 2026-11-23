@@ -23,6 +23,10 @@ async function executar(botao, acao) {
   }
 }
 
+/**
+ * Trata qualquer erro de operacao: 401 volta para o login pedindo nova entrada; 502 vira aviso
+ * amarelo; o resto vira erro vermelho. Tudo tambem e anotado no Diario.
+ */
 function tratarErro(erro) {
   if (erro.status === 401) {
     view.registrarNoDiario(`401 - ${erro.message}`, 'erro');
@@ -38,6 +42,9 @@ function tratarErro(erro) {
   view.registrarNoDiario(`${erro.status || 'rede'} - ${erro.message}`, 'erro');
 }
 
+/**
+ * Devolve a conta que esta na tela. Se nenhuma foi consultada ainda, mostra um erro e devolve null.
+ */
 function contaEmFoco() {
   const conta = api.estado.contaEmFoco;
   if (!conta) {
@@ -49,6 +56,10 @@ function contaEmFoco() {
 
 /* --------------------------------- login -------------------------------- */
 
+/**
+ * Liga o formulario de login (chama a API e abre a tela principal) e o botao Sair (encerra a sessao
+ * e limpa a tela).
+ */
 function ligarLogin() {
   el('form-login').addEventListener('submit', async (evento) => {
     evento.preventDefault();
@@ -83,6 +94,10 @@ function ligarLogin() {
 
 /* ------------------------------- agencias ------------------------------- */
 
+/**
+ * Liga o seletor de agencia da barra superior: troca a porta de entrada, limpa a conta em foco e
+ * explica a regra id % 3.
+ */
 function ligarSeletorDeAgencia() {
   el('seletor-agencia').addEventListener('change', (evento) => {
     const idAgencia = Number(evento.target.value);
@@ -99,6 +114,7 @@ function ligarSeletorDeAgencia() {
 
 /* -------------------------------- contas -------------------------------- */
 
+/** Liga o formulario de consulta: busca a conta pelo numero e desenha o cartao. */
 function ligarConsulta() {
   el('form-consulta').addEventListener('submit', (evento) => {
     evento.preventDefault();
@@ -111,6 +127,7 @@ function ligarConsulta() {
   });
 }
 
+/** Liga o formulario de criacao de conta: cria na agencia atual e ja mostra a conta criada. */
 function ligarCriacaoDeConta() {
   el('form-criar').addEventListener('submit', (evento) => {
     evento.preventDefault();
@@ -128,6 +145,7 @@ function ligarCriacaoDeConta() {
   });
 }
 
+/** Liga o formulario de deposito: deposita na conta em foco e redesenha o saldo. */
 function ligarDeposito() {
   el('form-depositar').addEventListener('submit', (evento) => {
     evento.preventDefault();
@@ -145,6 +163,7 @@ function ligarDeposito() {
   });
 }
 
+/** Liga o formulario de saque: saca da conta em foco e redesenha o saldo. */
 function ligarSaque() {
   el('form-sacar').addEventListener('submit', (evento) => {
     evento.preventDefault();
@@ -164,6 +183,10 @@ function ligarSaque() {
 
 /* ----------------------------- transferencias --------------------------- */
 
+/**
+ * Envia a transferencia e mostra o resultado: local ou entre agencias, reenvio ignorado pela
+ * idempotencia, ou 502 com o saldo recarregado para provar que o debito foi revertido.
+ */
 async function enviarTransferencia(botao, { idOrigem, idDestino, valor, chaveIdempotencia }) {
   await executar(botao, async () => {
     let resultado;
@@ -208,6 +231,10 @@ async function enviarTransferencia(botao, { idOrigem, idDestino, valor, chaveIde
   });
 }
 
+/**
+ * Liga o formulario de transferencia (com a dica de destino e a chave de idempotencia opcional) e o
+ * botao que reenvia a ultima transferencia.
+ */
 function ligarTransferencia() {
   const campoDestino = el('transferencia-destino');
 
@@ -243,6 +270,7 @@ function ligarTransferencia() {
 
 /* --------------------------------- abas --------------------------------- */
 
+/** Liga os botoes das abas Depositar / Sacar / Transferir. */
 function ligarAbas() {
   document.querySelectorAll('.aba').forEach((aba) => {
     aba.addEventListener('click', () => {
@@ -252,6 +280,10 @@ function ligarAbas() {
   });
 }
 
+/**
+ * Ponto de partida do frontend: preenche os seletores, liga todos os eventos da tela e abre direto
+ * a tela principal se ja houver sessao salva.
+ */
 export function iniciar() {
   view.preencherAgencias();
   ligarLogin();

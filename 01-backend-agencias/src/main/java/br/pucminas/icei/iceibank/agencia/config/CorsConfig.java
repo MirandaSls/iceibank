@@ -18,6 +18,11 @@ import org.springframework.web.filter.CorsFilter;
 @Configuration
 public class CorsConfig {
 
+    /**
+     * Registra o filtro de CORS que libera o frontend (outra origem, porta 5500) a chamar a API.
+     * Roda com prioridade maxima, antes do JwtFilter, para que ate as respostas 401 cheguem ao
+     * navegador com os cabecalhos de CORS.
+     */
     @Bean
     public FilterRegistrationBean<CorsFilter> corsFilter() {
         CorsConfiguration configuracao = new CorsConfiguration();

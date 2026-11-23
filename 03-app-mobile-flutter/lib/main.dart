@@ -12,6 +12,8 @@ import 'telas/tela_principal.dart';
 const Color _corSemente = Color(0xFF0B6E4F);
 const String _msgSessaoExpirada = 'Sessão expirada. Entre novamente.';
 
+/// Ponto de entrada do app. Abre o armazenamento local (Hive), restaura a sessao salva se houver,
+/// cria o servico de contas (offline-first) e o servico de lideranca, e sobe a interface.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -42,6 +44,7 @@ class IceiBankApp extends StatefulWidget {
     required this.lideranca,
   });
 
+  /// Cria o estado da raiz do app, que controla a navegacao entre login e tela principal.
   @override
   State<IceiBankApp> createState() => _IceiBankAppState();
 }
@@ -56,8 +59,11 @@ class _IceiBankAppState extends State<IceiBankApp> {
   /// sincronizacao em segundo plano antes de alguem entrar.
   late bool _naTelaPrincipal = widget.api.autenticado;
 
+  /// Atalho para o cliente HTTP recebido pelo widget.
   ApiClient get _api => widget.api;
 
+  /// Ao abrir o app: registra o que fazer quando o token expirar e, se ja houver alguem logado,
+  /// liga o polling da lider.
   @override
   void initState() {
     super.initState();
@@ -65,6 +71,8 @@ class _IceiBankAppState extends State<IceiBankApp> {
     if (_api.autenticado) widget.lideranca.iniciar();
   }
 
+  /// Ao fechar o app: desliga o aviso de sessao expirada e encerra os servicos de lideranca e de
+  /// contas.
   @override
   void dispose() {
     _api.aoExpirarSessao = null;
@@ -73,11 +81,15 @@ class _IceiBankAppState extends State<IceiBankApp> {
     super.dispose();
   }
 
+  /// Chamado pelo ApiClient quando qualquer rota devolve 401: apaga a sessao salva e volta para o
+  /// login com o aviso "Sessao expirada".
   void _aoExpirarSessao() {
     unawaited(widget.local.limparSessao());
     if (_naTelaPrincipal) _irParaLogin(mensagem: _msgSessaoExpirada);
   }
 
+  /// Faz o login, salva o token no aparelho, liga o polling da lider, abre a tela principal e ja
+  /// tenta sincronizar operacoes que ficaram pendentes.
   Future<void> _entrar(String usuario, String senha) async {
     await _api.login(usuario, senha);
     final token = _api.token;
@@ -94,12 +106,15 @@ class _IceiBankAppState extends State<IceiBankApp> {
     unawaited(widget.servico.sincronizarPendentes());
   }
 
+  /// Botao Sair: apaga o token da memoria e do aparelho e volta para o login.
   Future<void> _sair() async {
     _api.logout();
     await widget.local.limparSessao();
     _irParaLogin();
   }
 
+  /// Troca a tela atual pela tela de login (opcionalmente com uma mensagem) e para o polling da
+  /// lider.
   void _irParaLogin({String? mensagem}) {
     _naTelaPrincipal = false;
     widget.lideranca.parar();
@@ -109,9 +124,11 @@ class _IceiBankAppState extends State<IceiBankApp> {
     );
   }
 
+  /// Monta a tela de login ligada ao metodo _entrar.
   Widget _telaLogin({String? mensagem}) =>
       TelaLogin(aoEntrar: _entrar, mensagemInicial: mensagem);
 
+  /// Monta a tela principal com os servicos e lembrando a ultima conta consultada.
   Widget _telaPrincipal() => TelaPrincipal(
         usuario: _api.usuario ?? '',
         api: _api,
@@ -122,11 +139,13 @@ class _IceiBankAppState extends State<IceiBankApp> {
         aoLembrarConta: (id) => _ultimaConta = id,
       );
 
+  /// Cria o tema visual (Material 3) a partir da cor verde do app, no modo claro ou escuro.
   ThemeData _tema(Brightness brilho) => ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: _corSemente, brightness: brilho),
       );
 
+  /// Monta o MaterialApp: abre direto a tela principal se ja houver sessao, senao a de login.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(

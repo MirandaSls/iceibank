@@ -43,22 +43,37 @@ public class MensageriaConfig {
     public static final String EXCHANGE = "iceibank.eventos";
     public static final String EXCHANGE_DLX = "iceibank.eventos.dlx";
 
+    /** Nome da fila de creditos de uma agencia: fila-agencia-N. */
     public static String nomeDaFila(int idAgencia) {
         return "fila-agencia-" + idAgencia;
     }
 
+    /**
+     * Nome da dead-letter queue de uma agencia: fila-agencia-N.dlq (onde param os creditos
+     * rejeitados).
+     */
     public static String nomeDaFilaMortas(int idAgencia) {
         return nomeDaFila(idAgencia) + ".dlq";
     }
 
+    /** Routing key usada para mandar um credito para a agencia N: agencia.N.creditar. */
     public static String routingKeyDeCredito(int idAgencia) {
         return "agencia." + idAgencia + ".creditar";
     }
 
+    /**
+     * Routing key usada quando um credito da agencia N e rejeitado e vai para a DLQ:
+     * agencia.N.creditar.falhou.
+     */
     private static String routingKeyDeFalha(int idAgencia) {
         return routingKeyDeCredito(idAgencia) + ".falhou";
     }
 
+    /**
+     * Declara no RabbitMQ toda a topologia do ICEIBank: o exchange topic iceibank.eventos, o
+     * exchange de mortas (DLX) e, para cada agencia, a fila duravel, a DLQ e as ligacoes (bindings)
+     * entre eles.
+     */
     @Bean
     public Declarables topologiaIceibank() {
         TopicExchange exchange = new TopicExchange(EXCHANGE, true, false);

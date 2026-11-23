@@ -9,6 +9,7 @@ import '../models.dart';
 class SemConexaoException implements Exception {
   final String mensagem;
   const SemConexaoException([this.mensagem = 'Sem conexao com a agencia.']);
+  /// Mostra so a mensagem quando o erro e impresso ou exibido.
   @override
   String toString() => mensagem;
 }
@@ -20,8 +21,10 @@ class ApiException implements Exception {
   final Map<String, dynamic>? corpo;
   const ApiException(this.status, this.mensagem, [this.corpo]);
 
+  /// Diz se o erro foi 401 (token ausente ou expirado).
   bool get naoAutorizado => status == 401;
 
+  /// Mostra so a mensagem quando o erro e impresso ou exibido.
   @override
   String toString() => mensagem;
 }

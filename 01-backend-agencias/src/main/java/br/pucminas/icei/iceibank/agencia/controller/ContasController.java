@@ -33,10 +33,18 @@ public class ContasController {
 
     private final EstadoAgencia estado;
 
+    /**
+     * Recebe por injecao o estado da agencia (mapa de contas, relogio vetorial e log de eventos).
+     */
     public ContasController(EstadoAgencia estado) {
         this.estado = estado;
     }
 
+    /**
+     * POST /contas. Cria uma conta nesta agencia. Recusa com 400 se o id for invalido, se a conta
+     * nao pertencer a esta agencia (id % 3) ou se o saldo inicial for negativo; com 409 se a conta
+     * ja existir. Registra CRIAR_CONTA no log.
+     */
     @PostMapping
     public ResponseEntity<?> criarConta(@RequestBody CriarContaRequest requisicao) {
         if (requisicao.id() == null || requisicao.id() < 0) {
@@ -64,6 +72,11 @@ public class ContasController {
         return ResponseEntity.status(HttpStatus.CREATED).body(conta);
     }
 
+    /**
+     * GET /contas/{id}. Devolve a conta e o vetor atual da agencia (sem avancar o relogio). O app
+     * guarda esse vetor para usar depois na sincronizacao offline. 404 se a conta nao for desta
+     * agencia ou nao existir.
+     */
     @GetMapping("/{id}")
     public ResponseEntity<?> consultarSaldo(@PathVariable int id) {
         Conta conta = estado.contas().get(id);
@@ -73,6 +86,10 @@ public class ContasController {
         return ResponseEntity.ok(ContaComVetor.de(conta, estado.relogio().vetor()));
     }
 
+    /**
+     * POST /contas/{id}/depositar. Valida o valor, soma ao saldo, avanca o relogio (evento local),
+     * registra DEPOSITO e devolve a conta com o vetor novo.
+     */
     @PostMapping("/{id}/depositar")
     public ResponseEntity<?> depositar(@PathVariable int id, @RequestBody ValorRequest requisicao) {
         ResponseEntity<?> valorInvalido = validarValor(requisicao);
@@ -92,6 +109,10 @@ public class ContasController {
         return ResponseEntity.ok(ContaComVetor.de(conta, ts));
     }
 
+    /**
+     * POST /contas/{id}/sacar. Valida o valor, confere se ha saldo suficiente (400 se nao houver),
+     * subtrai, avanca o relogio, registra SAQUE e devolve a conta com o vetor novo.
+     */
     @PostMapping("/{id}/sacar")
     public ResponseEntity<?> sacar(@PathVariable int id, @RequestBody ValorRequest requisicao) {
         ResponseEntity<?> valorInvalido = validarValor(requisicao);
@@ -114,6 +135,12 @@ public class ContasController {
         return ResponseEntity.ok(ContaComVetor.de(conta, ts));
     }
 
+    /**
+     * POST /contas/{id}/sincronizar. Aplica uma operacao feita offline pelo app. So aplica se o
+     * vetorConhecido enviado pelo app for IGUAL ao vetor atual da agencia (ninguem mexeu desde a
+     * ultima leitura). Se for diferente, responde 409 com o vetor atual, a relacao entre os vetores
+     * e o saldo real.
+     */
     @PostMapping("/{id}/sincronizar")
     public ResponseEntity<?> sincronizar(@PathVariable int id, @RequestBody SincronizacaoRequest requisicao) {
         if (requisicao.valor() == null || requisicao.valor().signum() <= 0) {
@@ -148,6 +175,10 @@ public class ContasController {
                 });
     }
 
+    /**
+     * Aplica de fato a operacao pendente vinda do app (deposito ou saque), avanca o relogio e
+     * registra SINCRONIZACAO_OFFLINE. So e chamado quando os vetores conferem.
+     */
     private ResponseEntity<?> aplicarOperacaoPendente(Conta conta, String tipo, BigDecimal valor) {
         if (TIPO_SAQUE.equals(tipo) && !conta.temSaldoPara(valor)) {
             return ResponseEntity.badRequest().body(new Erro("Saldo insuficiente."));
@@ -163,6 +194,10 @@ public class ContasController {
         return ResponseEntity.ok(ContaComVetor.de(conta, ts));
     }
 
+    /**
+     * Confere se o valor da operacao existe e e maior que zero. Devolve um 400 pronto, ou null se o
+     * valor for valido.
+     */
     private ResponseEntity<?> validarValor(ValorRequest requisicao) {
         if (requisicao == null || requisicao.valor() == null || requisicao.valor().signum() <= 0) {
             return ResponseEntity.badRequest().body(new Erro("Valor deve ser maior que zero."));
@@ -170,11 +205,16 @@ public class ContasController {
         return null;
     }
 
+    /** Resposta 404 padrao para conta que nao existe nesta agencia. */
     private ResponseEntity<?> contaNaoEncontrada() {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new Erro("Conta nao encontrada nesta agencia."));
     }
 
+    /**
+     * Monta um mapa ordenado a partir de pares chave, valor ("id", 3, "valor", 10...). Usado para
+     * preencher o campo detalhes de cada evento gravado no log.
+     */
     public static Map<String, Object> detalhes(Object... paresChaveValor) {
         Map<String, Object> mapa = new LinkedHashMap<>();
         for (int i = 0; i < paresChaveValor.length; i += 2) {

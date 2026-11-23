@@ -18,6 +18,7 @@ class ContaRemota {
     this.vetorAtual = const [],
   });
 
+  /// Converte o JSON recebido da API (ou do cache) em ContaRemota.
   factory ContaRemota.fromJson(Map<String, dynamic> json) => ContaRemota(
         id: (json['id'] as num).toInt(),
         nomeAluno: (json['nomeAluno'] ?? '') as String,
@@ -27,6 +28,7 @@ class ContaRemota {
             .toList(),
       );
 
+  /// Converte a conta em JSON para salvar no cache local (Hive).
   Map<String, dynamic> toJson() => {
         'id': id,
         'nomeAluno': nomeAluno,
@@ -34,6 +36,7 @@ class ContaRemota {
         'vetorAtual': vetorAtual,
       };
 
+  /// Devolve uma copia da conta trocando so o saldo e/ou o vetor.
   ContaRemota copiarCom({double? saldo, List<int>? vetorAtual}) => ContaRemota(
         id: id,
         nomeAluno: nomeAluno,
@@ -86,6 +89,7 @@ class OperacaoPendente {
     this.mensagem,
   });
 
+  /// Converte o JSON salvo no Hive em OperacaoPendente.
   factory OperacaoPendente.fromJson(Map<String, dynamic> json) => OperacaoPendente(
         idLocal: json['idLocal'] as String,
         contaId: (json['contaId'] as num).toInt(),
@@ -98,6 +102,7 @@ class OperacaoPendente {
         mensagem: json['mensagem'] as String?,
       );
 
+  /// Converte a operacao pendente em JSON para salvar na fila local (Hive).
   Map<String, dynamic> toJson() => {
         'idLocal': idLocal,
         'contaId': contaId,
@@ -109,6 +114,7 @@ class OperacaoPendente {
         'mensagem': mensagem,
       };
 
+  /// Devolve uma copia da operacao trocando o status, a mensagem e/ou o vetorConhecido.
   OperacaoPendente copiarCom({String? status, String? mensagem, List<int>? vetorConhecido}) =>
       OperacaoPendente(
         idLocal: idLocal,
@@ -131,6 +137,7 @@ class RespostaLider {
   final int? liderAtual;
   const RespostaLider(this.idAgencia, this.liderAtual);
 
+  /// Converte o JSON de GET /bully/lider em RespostaLider.
   factory RespostaLider.fromJson(Map<String, dynamic> json) => RespostaLider(
         (json['idAgencia'] as num).toInt(),
         (json['liderAtual'] as num?)?.toInt(),

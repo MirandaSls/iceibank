@@ -24,6 +24,10 @@ public class EstadoAgencia {
     private final Map<String, ResultadoTransferencia> chavesDeIdempotencia = new ConcurrentHashMap<>();
     private final Set<String> mensagensProcessadas = ConcurrentHashMap.newKeySet();
 
+    /**
+     * Cria o estado da agencia na subida: guarda o id, cria o relogio vetorial com 3 posicoes e
+     * abre o arquivo de log data/eventos-agencia-N.jsonl.
+     */
     public EstadoAgencia(
             @Value("${iceibank.agencia.id:0}") int idAgencia,
             @Value("${iceibank.dados.pasta:data}") String pastaDados) {
@@ -32,22 +36,30 @@ public class EstadoAgencia {
         this.registro = new RegistroEventos("agencia-" + idAgencia, Paths.get(pastaDados));
     }
 
+    /** Devolve o id desta agencia (0, 1 ou 2). */
     public int idAgencia() {
         return idAgencia;
     }
 
+    /** Devolve o nome usado no log, ex.: "agencia-0". */
     public String nomeAgencia() {
         return "agencia-" + idAgencia;
     }
 
+    /** Devolve o relogio vetorial desta agencia. */
     public RelogioVetorial relogio() {
         return relogio;
     }
 
+    /** Devolve o registro de eventos (log .jsonl) desta agencia. */
     public RegistroEventos registro() {
         return registro;
     }
 
+    /**
+     * Devolve o mapa de contas desta agencia (id -> Conta). Fica so em memoria: reiniciar a agencia
+     * apaga as contas.
+     */
     public Map<Integer, Conta> contas() {
         return contas;
     }

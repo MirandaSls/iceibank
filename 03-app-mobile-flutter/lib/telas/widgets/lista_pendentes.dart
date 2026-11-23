@@ -16,6 +16,7 @@ class ListaPendentes extends StatelessWidget {
     required this.aoDescartar,
   });
 
+  /// Desenha o cartao com a lista de operacoes offline da conta em foco.
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
@@ -72,6 +73,7 @@ class _ItemPendente extends StatelessWidget {
     required this.aoDescartar,
   });
 
+  /// Desenha uma operacao da fila: tipo, valor, hora de criacao e status.
   @override
   Widget build(BuildContext context) {
     final deposito = operacao.tipo == TipoOperacao.deposito;
@@ -108,6 +110,7 @@ class ChipStatus extends StatelessWidget {
   final String status;
   const ChipStatus({super.key, required this.status});
 
+  /// Desenha o chip de status (Pendente, Conflito ou Recusada) com icone e texto.
   @override
   Widget build(BuildContext context) {
     final cores = Theme.of(context).colorScheme;

@@ -19,6 +19,10 @@ public class UsuariosEmMemoria {
             "bruno", "senha123",
             "carla", "senha123");
 
+    /**
+     * Confere se usuario e senha batem com os cadastrados (ana, bruno, carla / senha123). Ignora
+     * maiusculas e espacos no nome do usuario.
+     */
     public boolean credenciaisValidas(String usuario, String senha) {
         if (usuario == null || senha == null) {
             return false;

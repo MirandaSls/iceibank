@@ -22,12 +22,21 @@ public class AuthController {
     private final JwtService jwtService;
     private final EstadoAgencia estado;
 
+    /**
+     * Recebe por injecao do Spring a lista de usuarios, o servico de JWT e o estado da agencia
+     * (para registrar o evento de login no log).
+     */
     public AuthController(UsuariosEmMemoria usuarios, JwtService jwtService, EstadoAgencia estado) {
         this.usuarios = usuarios;
         this.jwtService = jwtService;
         this.estado = estado;
     }
 
+    /**
+     * POST /auth/login. Confere usuario e senha; se estiverem errados responde 401 e registra
+     * LOGIN_RECUSADO. Se estiverem certos, gera um JWT de 15 minutos, registra LOGIN e devolve o
+     * token.
+     */
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest requisicao) {
         if (!usuarios.credenciaisValidas(requisicao.usuario(), requisicao.senha())) {

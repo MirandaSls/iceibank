@@ -31,6 +31,10 @@ public class JwtService {
     private final SecretKey chave;
     private final Duration validadeDoUsuario;
 
+    /**
+     * Monta a chave HMAC a partir do segredo configurado (o mesmo nas 3 agencias) e guarda a
+     * validade do token de usuario (15 minutos por padrao).
+     */
     public JwtService(
             @Value("${iceibank.jwt.segredo}") String segredo,
             @Value("${iceibank.jwt.validade-minutos:15}") long validadeMinutos) {
@@ -38,10 +42,15 @@ public class JwtService {
         this.validadeDoUsuario = Duration.ofMinutes(validadeMinutos);
     }
 
+    /** Gera o token de uma pessoa que fez login: tipo USUARIO, validade de 15 minutos. */
     public String gerarTokenDeUsuario(String usuario) {
         return gerarToken(usuario, TIPO_USUARIO, validadeDoUsuario);
     }
 
+    /**
+     * Gera um JWT assinado com o assunto (usuario), o tipo do token, a data de emissao e a data de
+     * expiracao.
+     */
     public String gerarToken(String assunto, String tipo, Duration validade) {
         Instant agora = Instant.now();
         return Jwts.builder()
@@ -66,6 +75,7 @@ public class JwtService {
                 .getPayload();
     }
 
+    /** Devolve a validade do token de usuario em segundos (vai na resposta do login). */
     public long validadeDoUsuarioEmSegundos() {
         return validadeDoUsuario.toSeconds();
     }

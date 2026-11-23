@@ -35,10 +35,16 @@ public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
 
+    /** Recebe por injecao o JwtService, usado para validar o token. */
     public JwtFilter(JwtService jwtService) {
         this.jwtService = jwtService;
     }
 
+    /**
+     * Executado em TODA requisicao. Libera as rotas publicas; nas demais exige o cabecalho
+     * Authorization: Bearer, valida assinatura e expiracao do token e confere se o tipo e USUARIO.
+     * Em qualquer falha responde 401 com a explicacao e interrompe a requisicao.
+     */
     @Override
     protected void doFilterInternal(HttpServletRequest requisicao, HttpServletResponse resposta,
             FilterChain cadeia) throws ServletException, IOException {
@@ -75,6 +81,7 @@ public class JwtFilter extends OncePerRequestFilter {
         cadeia.doFilter(requisicao, resposta);
     }
 
+    /** Diz se a rota dispensa token: preflight CORS (OPTIONS), /auth/*, /bully/* e /error. */
     private boolean rotaPublica(HttpServletRequest requisicao) {
         String caminho = requisicao.getRequestURI();
         return HttpMethod.OPTIONS.matches(requisicao.getMethod())
@@ -83,6 +90,7 @@ public class JwtFilter extends OncePerRequestFilter {
                 || caminho.equals("/error");
     }
 
+    /** Escreve a resposta 401 com um JSON {"erro": mensagem}. */
     private void recusar(HttpServletResponse resposta, String mensagem) throws IOException {
         resposta.setStatus(HttpStatus.UNAUTHORIZED.value());
         resposta.setContentType(MediaType.APPLICATION_JSON_VALUE);

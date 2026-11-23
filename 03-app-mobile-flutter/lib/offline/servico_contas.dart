@@ -15,9 +15,13 @@ import 'armazenamento_local.dart';
 
 /// Recorte da API usado pelo servico; permite trocar o ApiClient real por um fake nos testes.
 abstract class ApiContas {
+  /// Busca a conta na agencia.
   Future<ContaRemota> consultarConta(int idConta);
+  /// Deposita na agencia (online).
   Future<ContaRemota> depositar(int idConta, double valor);
+  /// Saca na agencia (online).
   Future<ContaRemota> sacar(int idConta, double valor);
+  /// Envia uma operacao feita offline para POST /contas/{id}/sincronizar.
   Future<ContaRemota> sincronizar(OperacaoPendente operacao);
 }
 
@@ -25,15 +29,19 @@ class ApiContasDoCliente implements ApiContas {
   final ApiClient _api;
   ApiContasDoCliente(this._api);
 
+  /// Repassa a consulta ao ApiClient real.
   @override
   Future<ContaRemota> consultarConta(int idConta) => _api.consultarConta(idConta);
 
+  /// Repassa o deposito ao ApiClient real.
   @override
   Future<ContaRemota> depositar(int idConta, double valor) => _api.depositar(idConta, valor);
 
+  /// Repassa o saque ao ApiClient real.
   @override
   Future<ContaRemota> sacar(int idConta, double valor) => _api.sacar(idConta, valor);
 
+  /// Repassa a sincronizacao ao ApiClient real.
   @override
   Future<ContaRemota> sincronizar(OperacaoPendente operacao) => _api.sincronizar(operacao);
 }
@@ -60,6 +68,7 @@ class EstadoConta {
     required this.atualizadoEm,
   });
 
+  /// Diz se a conta tem alguma operacao ainda aguardando sincronizacao.
   bool get temPendentes => pendentes.any((op) => op.status == StatusPendente.pendente);
 }
 
@@ -98,21 +107,28 @@ class ServicoContas extends ChangeNotifier {
   })  : _conectividadeInjetada = conectividade,
         _intervaloRetentativa = intervaloRetentativa;
 
+  /// Diz se a ultima tentativa de falar com a agencia funcionou.
   bool get online => _online;
+  /// Diz se a fila esta sendo enviada neste momento.
   bool get sincronizando => _sincronizando;
+  /// Ultima mensagem para mostrar ao usuario (ex.: "2 operacoes sincronizadas" ou um conflito).
   String? get ultimoAviso => _ultimoAviso;
 
+  /// Apaga a ultima mensagem depois que a tela ja mostrou.
   void limparAviso() {
     _ultimoAviso = null;
     _notificar();
   }
 
+  /// Lista as operacoes que precisam de decisao do usuario: em CONFLITO (409) ou RECUSADA.
   List<OperacaoPendente> get conflitos => _local
       .pendentes()
       .where((op) =>
           op.status == StatusPendente.conflito || op.status == StatusPendente.recusada)
       .toList();
 
+  /// Monta o retrato da conta para a tela: saldo confirmado (do cache), saldo provisorio
+  /// (confirmado + pendentes), lista de pendentes e se o dado veio do cache.
   EstadoConta estado(int idConta) {
     final conta = _local.conta(idConta);
     return EstadoConta(
@@ -124,6 +140,8 @@ class ServicoContas extends ChangeNotifier {
     );
   }
 
+  /// Consulta a conta na agencia e salva no cache. Sem conexao, devolve o que estiver no cache
+  /// (marcado como "do cache"); se nem isso existir, repassa o erro.
   Future<EstadoConta> carregar(int idConta) async {
     try {
       final conta = await _api.consultarConta(idConta);
@@ -141,12 +159,17 @@ class ServicoContas extends ChangeNotifier {
     }
   }
 
+  /// Deposito: tenta online; sem conexao, guarda na fila local para sincronizar depois.
   Future<ResultadoEscrita> depositar(int idConta, double valor) =>
       _escrever(idConta, TipoOperacao.deposito, valor);
 
+  /// Saque: tenta online; sem conexao, guarda na fila local para sincronizar depois.
   Future<ResultadoEscrita> sacar(int idConta, double valor) =>
       _escrever(idConta, TipoOperacao.saque, valor);
 
+  /// Logica comum de deposito e saque. Se ja houver pendentes na mesma agencia, sincroniza antes
+  /// (para nao furar a fila). Tenta a operacao online; se der SemConexaoException, coloca na fila
+  /// offline.
   Future<ResultadoEscrita> _escrever(int idConta, String tipo, double valor) async {
     if (!(valor > 0)) throw const ApiException(_statusRequisicaoInvalida, _msgValorInvalido);
 
@@ -173,6 +196,9 @@ class ServicoContas extends ChangeNotifier {
     }
   }
 
+  /// Coloca a operacao na fila local com o vetor que o app conhecia da conta (vetorConhecido).
+  /// Exige que a conta tenha sido consultada antes e, no saque, que o saldo provisorio cubra o
+  /// valor.
   Future<ResultadoEscrita> _enfileirar(int idConta, String tipo, double valor) async {
     final conta = _local.conta(idConta);
     if (conta == null || conta.vetorAtual.isEmpty) {
@@ -195,6 +221,9 @@ class ServicoContas extends ChangeNotifier {
     return ResultadoEscrita.enfileiradaOffline;
   }
 
+  /// Envia a fila de pendentes, uma por vez e em ordem. Aplicada: remove da fila e atualiza o
+  /// cache. 409: marca como CONFLITO e guarda o saldo real. Sem conexao: para e tenta depois. Outro
+  /// erro de regra: marca como RECUSADA.
   Future<void> sincronizarPendentes() async {
     if (_sincronizando) return;
     _sincronizando = true;
@@ -284,11 +313,14 @@ class ServicoContas extends ChangeNotifier {
     }
   }
 
+  /// Botao Descartar do cartao de conflito: remove a operacao da fila sem enviar.
   Future<void> descartar(String idLocal) async {
     await _local.removerPendente(idLocal);
     _notificar();
   }
 
+  /// Botao Reaplicar do cartao de conflito: atualiza o vetorConhecido com o vetor atual da agencia,
+  /// volta a operacao para PENDENTE e sincroniza de novo.
   Future<void> tentarNovamente(String idLocal) async {
     final op = _buscar(idLocal);
     if (op == null) return;
@@ -301,6 +333,8 @@ class ServicoContas extends ChangeNotifier {
     await sincronizarPendentes();
   }
 
+  /// Liga a sincronizacao automatica: escuta o connectivity_plus (quando a rede volta, envia a
+  /// fila) e tenta de novo a cada 5 s enquanto houver pendentes.
   void iniciar() {
     if (_assinatura != null) return;
     final fluxo = _conectividadeInjetada ??
@@ -321,6 +355,7 @@ class ServicoContas extends ChangeNotifier {
     if (_local.pendentes().any(_ehPendente)) unawaited(sincronizarPendentes());
   }
 
+  /// Ao destruir o servico: para o timer e a escuta de conectividade.
   @override
   void dispose() {
     _descartado = true;
@@ -329,17 +364,21 @@ class ServicoContas extends ChangeNotifier {
     super.dispose();
   }
 
+  /// Diz se a operacao ainda esta aguardando envio (status PENDENTE).
   static bool _ehPendente(OperacaoPendente op) => op.status == StatusPendente.pendente;
 
+  /// Calcula o saldo provisorio: saldo confirmado + efeito de cada operacao pendente da conta.
   double _saldoProvisorio(ContaRemota conta) => _local
       .pendentes()
       .where((op) => op.contaId == conta.id && _ehPendente(op))
       .fold(conta.saldo, (soma, op) => soma + op.efeitoNoSaldo);
 
+  /// Diz se ha operacao pendente em alguma conta da agencia informada.
   bool _temPendenteNaAgencia(int agencia) => _local
       .pendentes()
       .any((op) => _ehPendente(op) && agenciaResponsavel(op.contaId) == agencia);
 
+  /// Devolve a proxima operacao pendente da fila que ainda nao foi tentada nesta rodada.
   OperacaoPendente? _proximaPendente(Set<String> tentadas) {
     for (final op in _local.pendentes()) {
       if (_ehPendente(op) && !tentadas.contains(op.idLocal)) return op;
@@ -347,6 +386,7 @@ class ServicoContas extends ChangeNotifier {
     return null;
   }
 
+  /// Procura uma operacao da fila pelo id local.
   OperacaoPendente? _buscar(String idLocal) {
     for (final op in _local.pendentes()) {
       if (op.idLocal == idLocal) return op;
@@ -354,11 +394,13 @@ class ServicoContas extends ChangeNotifier {
     return null;
   }
 
+  /// Descreve a operacao para mensagens: "Deposito de R$ 10.00".
   String _descrever(OperacaoPendente op) {
     final nome = op.tipo == TipoOperacao.deposito ? 'Deposito' : 'Saque';
     return '$nome de R\$ ${op.valor.toStringAsFixed(2)}';
   }
 
+  /// Gera um id local unico para a operacao offline.
   String _novoIdLocal() =>
       '${DateTime.now().microsecondsSinceEpoch}-${_contadorIds++}-${identityHashCode(this)}';
 
@@ -373,6 +415,7 @@ class ServicoContas extends ChangeNotifier {
     return agora;
   }
 
+  /// Avisa a tela que algo mudou (se o servico ainda estiver ativo).
   void _notificar() {
     if (!_descartado) notifyListeners();
   }

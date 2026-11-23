@@ -13,6 +13,8 @@ class CartaoSaldo extends StatelessWidget {
   final EstadoConta estado;
   const CartaoSaldo({super.key, required this.idConta, required this.estado});
 
+  /// Desenha o cartao da conta: titular, numero, agencia, saldo confirmado em destaque, hora da
+  /// atualizacao e, se houver pendentes, o saldo provisorio separado.
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
@@ -93,6 +95,7 @@ class _SaldoProvisorio extends StatelessWidget {
   final int quantidade;
   const _SaldoProvisorio({required this.valor, required this.quantidade});
 
+  /// Desenha a linha do saldo provisorio com o selo "pendente".
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
@@ -149,6 +152,7 @@ class _SaldoProvisorio extends StatelessWidget {
 class SeloPendente extends StatelessWidget {
   const SeloPendente({super.key});
 
+  /// Desenha o selo "pendente de sincronizacao" (icone + texto).
   @override
   Widget build(BuildContext context) {
     final cores = Theme.of(context).colorScheme;

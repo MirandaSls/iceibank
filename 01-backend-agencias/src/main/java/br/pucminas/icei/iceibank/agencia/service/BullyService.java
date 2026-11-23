@@ -42,6 +42,10 @@ public class BullyService {
         return thread;
     });
 
+    /**
+     * Construtor usado pelo Spring: le os tempos de timeout e heartbeat da configuracao e usa o
+     * transporte HTTP real entre as agencias.
+     */
     @Autowired
     public BullyService(EstadoAgencia estado,
             @Value("${iceibank.bully.timeout-ms:1000}") long timeoutMs,
@@ -51,11 +55,16 @@ public class BullyService {
                 new HttpTransporteBully(Duration.ofMillis(timeoutMs)), habilitado, heartbeatMs);
     }
 
+    /**
+     * Construtor usado nos testes: recebe um transporte falso e desliga a eleicao automatica e o
+     * heartbeat.
+     */
     BullyService(int idAgencia, RelogioVetorial relogio, RegistroEventos registro, List<Agencia> agencias,
             TransporteBully transporte) {
         this(idAgencia, relogio, registro, agencias, transporte, false, 0);
     }
 
+    /** Construtor completo que os outros dois chamam; so guarda as dependencias. */
     private BullyService(int idAgencia, RelogioVetorial relogio, RegistroEventos registro,
             List<Agencia> agencias, TransporteBully transporte, boolean habilitado, long heartbeatMs) {
         this.idAgencia = idAgencia;
@@ -86,6 +95,11 @@ public class BullyService {
         }
     }
 
+    /**
+     * Heartbeat, executado a cada 3 s. Se nao conhece lider, inicia eleicao. Se a lider e ela
+     * mesma, nao faz nada. Senao pergunta a lider se esta viva; se nao responder, registra
+     * LIDER_NAO_RESPONDEU, esquece a lider e inicia nova eleicao (failover).
+     */
     public void verificarLider() {
         Integer lider = liderAtual.get();
         if (lider == null) {
@@ -105,6 +119,11 @@ public class BullyService {
         }
     }
 
+    /**
+     * Inicia uma eleicao do Bully: registra ELEICAO_INICIADA e envia "eleicao" so para as agencias
+     * de id MAIOR. Se nenhuma responder, esta agencia vira lider. Se alguma responder, espera o
+     * anuncio dela. Ignora a chamada se ja houver uma eleicao em andamento.
+     */
     public void iniciarEleicao() {
         if (!eleicaoEmAndamento.compareAndSet(false, true)) {
             return;
@@ -127,6 +146,10 @@ public class BullyService {
         }
     }
 
+    /**
+     * Torna esta agencia a lider: grava a lideranca, registra TORNOU_LIDER e envia "coordenador"
+     * para todas as outras agencias.
+     */
     void tornarMeLider() {
         liderAtual.set(idAgencia);
         registro.registrar("TORNOU_LIDER", relogio.eventoLocal(), detalhes("idAgencia", idAgencia));
@@ -138,6 +161,11 @@ public class BullyService {
         }
     }
 
+    /**
+     * Trata uma mensagem de eleicao recebida de uma agencia menor: atualiza o relogio com o vetor
+     * recebido, registra ELEICAO_RECEBIDA e comeca a propria eleicao em outra thread (para o 200
+     * voltar na hora).
+     */
     public void receberEleicao(int origemId, int[] vetorRecebido) {
         int[] vetor = relogio.aoReceber(vetorRecebido);
         registro.registrar("ELEICAO_RECEBIDA", vetor, detalhes("de", origemId, "minhaId", idAgencia));
@@ -146,16 +174,24 @@ public class BullyService {
         executor.execute(this::iniciarEleicao);
     }
 
+    /**
+     * Trata o anuncio de nova lider: grava quem e a lider, atualiza o relogio com o vetor recebido
+     * e registra LIDER_ANUNCIADO.
+     */
     public void receberCoordenador(int liderId, int[] vetorRecebido) {
         liderAtual.set(liderId);
         int[] vetor = relogio.aoReceber(vetorRecebido);
         registro.registrar("LIDER_ANUNCIADO", vetor, detalhes("liderId", liderId, "agencia", idAgencia));
     }
 
+    /**
+     * Devolve quem esta agencia considera a lider atual (null se estiver no meio de uma eleicao).
+     */
     public Integer obterLiderAtual() {
         return liderAtual.get();
     }
 
+    /** Chamado quando a agencia e desligada: para a thread do heartbeat e das eleicoes. */
     @PreDestroy
     public void encerrar() {
         executor.shutdownNow();

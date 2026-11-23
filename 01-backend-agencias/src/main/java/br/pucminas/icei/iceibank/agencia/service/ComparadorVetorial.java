@@ -13,9 +13,15 @@ public final class ComparadorVetorial {
         CONCORRENTES
     }
 
+    /** Construtor privado: a classe so tem o metodo estatico comparar. */
     private ComparadorVetorial() {
     }
 
+    /**
+     * Compara dois vetores de relogio. IGUAIS se todas as posicoes batem; ANTES se v1 <= v2 em tudo
+     * (v1 aconteceu antes); DEPOIS se o contrario; CONCORRENTES se cada um e maior em alguma
+     * posicao (nenhum viu o outro).
+     */
     public static Relacao comparar(int[] v1, int[] v2) {
         if (v1.length != v2.length) {
             throw new IllegalArgumentException("Vetores de tamanhos diferentes.");

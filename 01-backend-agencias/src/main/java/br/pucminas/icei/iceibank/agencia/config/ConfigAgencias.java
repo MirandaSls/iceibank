@@ -28,13 +28,24 @@ public final class ConfigAgencias {
             new Agencia(1, "http://localhost:" + (PORTA_BASE + 1)),
             new Agencia(2, "http://localhost:" + (PORTA_BASE + 2)));
 
+    /**
+     * Construtor privado: a classe so tem constantes e metodos estaticos, nao deve ser instanciada.
+     */
     private ConfigAgencias() {
     }
 
+    /**
+     * Regra do particionamento: devolve qual agencia e dona da conta (idConta % 3). Ex.: conta 7 ->
+     * agencia 1.
+     */
     public static int agenciaResponsavel(int idConta) {
         return idConta % NUMERO_AGENCIAS;
     }
 
+    /**
+     * Devolve a URL base (http://localhost:porta) da agencia pedida. Lanca IllegalArgumentException
+     * se o id nao existir.
+     */
     public static String urlDaAgencia(int idAgencia) {
         return AGENCIAS.stream()
                 .filter(agencia -> agencia.id() == idAgencia)
@@ -43,6 +54,10 @@ public final class ConfigAgencias {
                 .url();
     }
 
+    /**
+     * Devolve a porta HTTP da agencia: PORTA_BASE (4145) + id. Agencia 0 = 4145, 1 = 4146, 2 =
+     * 4147.
+     */
     public static int portaDaAgencia(int idAgencia) {
         return PORTA_BASE + idAgencia;
     }

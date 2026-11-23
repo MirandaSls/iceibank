@@ -19,6 +19,7 @@ public class ProcessadorCreditos {
 
     private final EstadoAgencia estado;
 
+    /** Recebe por injecao o estado da agencia (contas, relogio e log). */
     public ProcessadorCreditos(EstadoAgencia estado) {
         this.estado = estado;
     }
@@ -67,6 +68,7 @@ public class ProcessadorCreditos {
     }
 
     public static class CreditoRecusadoException extends RuntimeException {
+        /** Cria a excecao com o motivo da recusa do credito. */
         public CreditoRecusadoException(String mensagem) {
             super(mensagem);
         }

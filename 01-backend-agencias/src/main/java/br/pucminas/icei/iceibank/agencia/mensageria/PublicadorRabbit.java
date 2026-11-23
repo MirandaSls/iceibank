@@ -18,10 +18,18 @@ public class PublicadorRabbit implements PublicadorCreditos {
 
     private final RabbitTemplate rabbitTemplate;
 
+    /**
+     * Recebe por injecao o RabbitTemplate, o cliente do Spring para enviar mensagens ao RabbitMQ.
+     */
     public PublicadorRabbit(RabbitTemplate rabbitTemplate) {
         this.rabbitTemplate = rabbitTemplate;
     }
 
+    /**
+     * Publica a mensagem de credito no exchange iceibank.eventos com a routing key da agencia de
+     * destino. A mensagem e persistente (sobrevive a reinicio do broker) e leva o idMensagem para
+     * deduplicacao. Se o broker estiver fora, lanca PublicacaoFalhouException.
+     */
     @Override
     public void publicar(int agenciaDestino, CreditoMensagem mensagem) {
         try {

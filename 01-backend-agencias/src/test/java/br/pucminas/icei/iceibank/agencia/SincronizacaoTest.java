@@ -27,6 +27,8 @@ import org.springframework.test.web.servlet.ResultActions;
         "iceibank.agencia.id=0",
         "iceibank.dados.pasta=target/test-data",
         "iceibank.mensageria.habilitada=false",
+        // Sem eleicao em segundo plano: ela avanca o relogio e quebraria a comparacao de vetores.
+        "iceibank.bully.habilitado=false",
         "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration"
 })
 @Import(MensageriaDeTeste.class)

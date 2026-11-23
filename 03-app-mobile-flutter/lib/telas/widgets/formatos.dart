@@ -4,6 +4,7 @@ library;
 
 final RegExp _maisDeDuasCasas = RegExp(r'\.\d{3,}$');
 
+/// Completa com zero a esquerda: 5 -> "05".
 String _doisDigitos(int n) => n.toString().padLeft(2, '0');
 
 /// 1234.5 -> "R$ 1.234,50"; -20 -> "-R$ 20,00".
@@ -47,11 +48,13 @@ String? validarValor(String? texto, {bool permitirZero = false}) {
   return null;
 }
 
+/// Converte o texto em numero de conta (inteiro >= 0); devolve null se for invalido.
 int? lerIdConta(String? texto) {
   final id = int.tryParse((texto ?? '').trim());
   if (id == null || id < 0) return null;
   return id;
 }
 
+/// Validador do campo de numero de conta: devolve a mensagem de erro, ou null se estiver valido.
 String? validarIdConta(String? texto) =>
     lerIdConta(texto) == null ? 'Informe um número de conta (inteiro, 0 ou maior)' : null;
