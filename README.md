@@ -92,9 +92,9 @@ Rode **um sprint de cada vez**: todos usam as mesmas portas. Para trocar de spri
 
 O script:
 
-1. **Sprints 1 e 2:** na primeira vez, extrai o código daquele sprint (tags git `sprint-1` e
-   `sprint-2`) para a pasta `.sprints\sprint-N`, que fica fora do Git. O Sprint 3 usa as pastas
-   `01-backend-agencias` e `02-frontend-web`;
+1. **Sprints 1 e 2:** na primeira vez, extrai o código daquele sprint (o último commit do
+   Sprint 1, `a8570bf`, e do Sprint 2, `9b30e3a`) para a pasta `.sprints\sprint-N`, que fica
+   fora do Git. O Sprint 3 usa as pastas `01-backend-agencias` e `02-frontend-web`;
 2. compila o backend do sprint na primeira vez (Maven Wrapper);
 3. **Sprints 2 e 3:** sobe o RabbitMQ via Docker, se você não tiver definido `RABBITMQ_URL` e o
    Docker existir;
@@ -106,8 +106,11 @@ O script:
 Login: **`ana` / `senha123`** (também `bruno` e `carla`), em todos os sprints.
 
 Para os Sprints 1 e 2 o projeto precisa ter sido baixado com `git clone` (o ZIP do GitHub não traz o
-histórico). Sem Git, baixe no GitHub o ZIP da tag `sprint-1` ou `sprint-2` e extraia o conteúdo em
-`.sprints\sprint-1` (ou `-2`), de forma que exista `.sprints\sprint-1\agencia`.
+histórico). Sem Git, baixe o ZIP do commit do sprint
+(<https://github.com/MirandaSls/iceibank/archive/a8570bf09d1fe4a9ee3791d2bed232204f659129.zip> para o Sprint 1,
+<https://github.com/MirandaSls/iceibank/archive/9b30e3ad52a383ca9e742ca93fa04d1c9a792c16.zip> para o Sprint 2)
+e extraia o conteúdo da pasta de dentro do ZIP em `.sprints\sprint-1` (ou `-2`), de forma que exista
+`.sprints\sprint-1\agencia`.
 
 #### O que mostrar em cada sprint
 
@@ -188,7 +191,7 @@ completo em [`03-app-mobile-flutter/README.md`](03-app-mobile-flutter/README.md)
 | "a execução de scripts foi desabilitada" | use os `.bat` ou `powershell -ExecutionPolicy Bypass -File ...` |
 | `Unable to rename ... .jar` ao recompilar | as agências estão rodando: `scripts\parar-tudo.bat` antes |
 | Porta 4145 / 5500 em uso | outro sprint (ou outra pessoa) já está rodando: `scripts\parar-tudo.bat` |
-| "Nao consegui extrair a tag sprint-N" | rode `git fetch --tags` na raiz do projeto e tente de novo |
+| "Nao consegui extrair o commit ... do Sprint N" | rode `git pull` na raiz do projeto e tente de novo |
 | Transferência entre agências dá 502 | RabbitMQ fora: suba o Docker ou defina `RABBITMQ_URL` |
 | Navegador mostra "Failed to fetch" | agência daquela porta não está no ar (veja a janela dela) |
 | Contas sumiram | o estado é em memória: reiniciar a agência zera as contas (é proposital) |

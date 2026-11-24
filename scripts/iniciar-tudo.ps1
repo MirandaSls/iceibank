@@ -1,8 +1,8 @@
 # ICEIBank - sobe o sistema de UM sprint no Windows.
 #
 #   Sprint 3 (padrao): o codigo atual da pasta 01-backend-agencias / 02-frontend-web.
-#   Sprint 1 e 2: o codigo exatamente como foi entregue naquele sprint (tags git sprint-1 e
-#   sprint-2), extraido para a pasta .sprints\sprint-N na primeira vez.
+#   Sprint 1 e 2: o codigo exatamente como foi entregue naquele sprint (o ultimo commit de cada
+#   um, ver $commitDoSprint abaixo), extraido para a pasta .sprints\sprint-N na primeira vez.
 #
 # O script:
 #   - prepara e compila o backend do sprint (Maven Wrapper: nao precisa ter Maven instalado)
@@ -23,6 +23,13 @@ $ErrorActionPreference = 'Stop'
 $raiz       = Split-Path -Parent $PSScriptRoot
 $backendS3  = Join-Path $raiz '01-backend-agencias'
 $servidor   = Join-Path $PSScriptRoot 'servidor-frontend.ps1'
+
+# Ultimo commit de cada sprint ja entregue. Ficam no historico da main, entao qualquer
+# 'git clone' do projeto ja os tem. (Sprint 3 = codigo atual, nao precisa extrair.)
+$commitDoSprint = @{
+    '1' = 'a8570bf09d1fe4a9ee3791d2bed232204f659129'   # docs: adiciona video de apresentacao do sprint 1
+    '2' = '9b30e3ad52a383ca9e742ca93fa04d1c9a792c16'   # docs(sprint2): adiciona as capturas de tela reais
+}
 
 $descricao = @{
     '1' = 'REST + relogio de Lamport + JWT + frontend (transferencia entre agencias por HTTP)'
@@ -72,19 +79,16 @@ if ($Sprint -eq '3') {
     if (-not (Test-Path $backend)) {
         if (-not (Test-Path (Join-Path $raiz '.git')) -or -not (Get-Command git -ErrorAction SilentlyContinue)) {
             Write-Host "Para rodar o Sprint $Sprint e preciso o Git e o projeto baixado com 'git clone'." -ForegroundColor Red
-            Write-Host "Alternativa sem Git: no GitHub, baixe o ZIP da tag sprint-$Sprint e extraia o conteudo" -ForegroundColor Red
+            Write-Host "Alternativa sem Git: baixe https://github.com/MirandaSls/iceibank/archive/$($commitDoSprint[$Sprint]).zip e extraia o conteudo" -ForegroundColor Red
             Write-Host "em $pastaSprint (de forma que exista $backend)." -ForegroundColor Red
             exit 1
         }
-        Write-Host ">> Extraindo o codigo do Sprint $Sprint (tag sprint-$Sprint) para .sprints\sprint-$Sprint ..." -ForegroundColor Cyan
-        # Traz as tags do GitHub so se o clone for anterior a elas.
-        $tag = git -C $raiz rev-parse -q --verify "refs/tags/sprint-$Sprint"
-        if (-not $tag) {
-            git -C $raiz fetch -q origin --tags
-        }
-        git -C $raiz worktree add -q --detach $pastaSprint "sprint-$Sprint"
+        $commit = $commitDoSprint[$Sprint]
+        Write-Host ">> Extraindo o codigo do Sprint $Sprint (commit $($commit.Substring(0, 7))) para .sprints\sprint-$Sprint ..." -ForegroundColor Cyan
+        git -C $raiz worktree add -q --detach $pastaSprint $commit
         if ($LASTEXITCODE -ne 0 -or -not (Test-Path $backend)) {
-            Write-Host "Nao consegui extrair a tag sprint-$Sprint. Rode 'git fetch --tags' e tente de novo." -ForegroundColor Red
+            Write-Host "Nao consegui extrair o commit $commit do Sprint $Sprint." -ForegroundColor Red
+            Write-Host "Rode 'git pull' na raiz do projeto (o clone precisa ter o historico completo) e tente de novo." -ForegroundColor Red
             exit 1
         }
     }
