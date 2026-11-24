@@ -1,10 +1,14 @@
 # Servidor estatico minimo para o frontend web (02-frontend-web) em http://localhost:5500.
 # Existe para o PC do laboratorio nao precisar de Python nem Node: usa so o PowerShell (.NET).
 # Alternativa equivalente, se tiver Python:  cd 02-frontend-web; python -m http.server 5500
-param([int]$Porta = 5500)
+# -Pasta escolhe qual frontend servir (o iniciar-tudo.ps1 passa a pasta do sprint escolhido).
+param(
+    [int]$Porta = 5500,
+    [string]$Pasta = (Join-Path (Split-Path -Parent $PSScriptRoot) '02-frontend-web')
+)
 
 $host.UI.RawUI.WindowTitle = "ICEIBank - Frontend (porta $Porta)"
-$pasta = [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $PSScriptRoot) '02-frontend-web'))
+$raizSite = [IO.Path]::GetFullPath($Pasta).TrimEnd('\') + '\'
 $tipos = @{
     '.html' = 'text/html; charset=utf-8'
     '.js'   = 'text/javascript; charset=utf-8'
@@ -27,9 +31,9 @@ try {
         try {
             $caminho = [Uri]::UnescapeDataString($contexto.Request.Url.AbsolutePath).TrimStart('/')
             if ([string]::IsNullOrEmpty($caminho)) { $caminho = 'index.html' }
-            $arquivo = [IO.Path]::GetFullPath((Join-Path $pasta $caminho))
+            $arquivo = [IO.Path]::GetFullPath((Join-Path $raizSite $caminho))
 
-            if ($arquivo.StartsWith($pasta, [StringComparison]::OrdinalIgnoreCase) -and
+            if ($arquivo.StartsWith($raizSite, [StringComparison]::OrdinalIgnoreCase) -and
                 (Test-Path -LiteralPath $arquivo -PathType Leaf)) {
                 $bytes = [IO.File]::ReadAllBytes($arquivo)
                 $extensao = [IO.Path]::GetExtension($arquivo).ToLower()

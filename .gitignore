@@ -24,3 +24,6 @@ desktop.ini
 
 # macOS
 .DS_Store
+
+# Codigo dos Sprints 1 e 2 extraido pelos scripts (git worktree das tags sprint-1/sprint-2)
+.sprints/

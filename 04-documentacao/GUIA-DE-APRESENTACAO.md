@@ -4,7 +4,8 @@ Roteiro para apresentar o projeto ao professor: **o que foi feito em cada ponto,
 onde está no código**. Os links de código abrem o arquivo direto na linha (no GitHub).
 
 > Ordem sugerida (~10 min): 1) visão geral e pastas → 2) Sprint 1 → 3) Sprint 2 → 4) Sprint 3 →
-> 5) testes. Se der para rodar ao vivo, use `scripts\iniciar-tudo.bat` (ver `README.md`); se não, use
+> 5) testes. Se der para rodar ao vivo, cada sprint tem o seu atalho: `scripts\sprint-1.bat`,
+> `sprint-2.bat` e `sprint-3.bat`, um de cada vez (ver `README.md`); se não, use
 > os prints desta página.
 
 ---

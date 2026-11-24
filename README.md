@@ -70,25 +70,58 @@ cd iceibank
 
 (Ou *Code → Download ZIP* no GitHub e extraia numa pasta **sem acentos**.)
 
-### 3. Subir tudo (jeito rápido)
+### 3. Executar um sprint (jeito rápido)
 
-Dê **dois cliques** em `scripts\iniciar-tudo.bat` (ou rode no PowerShell, na raiz do projeto):
+Cada sprint roda **separado**, com o código exatamente como foi entregue naquele sprint. Dê **dois
+cliques** no `.bat` do sprint que quer mostrar:
+
+| Atalho | O que sobe | Precisa de RabbitMQ? |
+|---|---|---|
+| `scripts\sprint-1.bat` | REST + **relógio de Lamport** + JWT + frontend. Transferência entre agências é uma **chamada HTTP** e a falha conhecida (débito sem crédito) aparece | não |
+| `scripts\sprint-2.bat` | Transferência via **RabbitMQ** + **relógio vetorial** + dead-letter queue | sim, para transferir entre agências |
+| `scripts\sprint-3.bat` | Tudo do Sprint 2 + **eleição de líder (Bully)** + heartbeat + sincronização offline do app | sim, para transferir entre agências |
+
+(`scripts\iniciar-tudo.bat` é o mesmo que o Sprint 3.) Pelo PowerShell, na raiz do projeto:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\iniciar-tudo.ps1
+powershell -ExecutionPolicy Bypass -File scripts\iniciar-tudo.ps1 -Sprint 1
 ```
+
+Rode **um sprint de cada vez**: todos usam as mesmas portas. Para trocar de sprint, rode
+`scripts\parar-tudo.bat` antes.
 
 O script:
 
-1. compila o backend na primeira vez (`01-backend-agencias\mvnw.cmd package`);
-2. sobe o RabbitMQ via Docker, se você não tiver definido `RABBITMQ_URL` e o Docker existir;
-3. abre **3 janelas**, uma por agência (portas **4145**, **4146**, **4147**);
-4. abre 1 janela servindo o frontend em **<http://localhost:5500>** e abre o navegador;
-5. mostra quem é a líder em cada agência (deve ser a **Agência 2**).
+1. **Sprints 1 e 2:** na primeira vez, extrai o código daquele sprint (tags git `sprint-1` e
+   `sprint-2`) para a pasta `.sprints\sprint-N`, que fica fora do Git. O Sprint 3 usa as pastas
+   `01-backend-agencias` e `02-frontend-web`;
+2. compila o backend do sprint na primeira vez (Maven Wrapper);
+3. **Sprints 2 e 3:** sobe o RabbitMQ via Docker, se você não tiver definido `RABBITMQ_URL` e o
+   Docker existir;
+4. abre **3 janelas**, uma por agência (portas **4145**, **4146**, **4147**), com o sprint no título;
+5. abre 1 janela servindo o frontend **daquele sprint** em **<http://localhost:5500>** e abre o
+   navegador;
+6. **Sprint 3:** mostra quem é a líder em cada agência (deve ser a **Agência 2**).
 
-Login: **`ana` / `senha123`** (também `bruno` e `carla`).
+Login: **`ana` / `senha123`** (também `bruno` e `carla`), em todos os sprints.
 
-Para parar: `scripts\parar-tudo.bat`.
+Para os Sprints 1 e 2 o projeto precisa ter sido baixado com `git clone` (o ZIP do GitHub não traz o
+histórico). Sem Git, baixe no GitHub o ZIP da tag `sprint-1` ou `sprint-2` e extraia o conteúdo em
+`.sprints\sprint-1` (ou `-2`), de forma que exista `.sprints\sprint-1\agencia`.
+
+#### O que mostrar em cada sprint
+
+| Sprint | Demonstração | Como |
+|---|---|---|
+| 1 | Transferência entre agências por HTTP | transfira da conta 0 (Agência 0) para a conta 1 (Agência 1) |
+| 1 | Falha conhecida | feche a janela da Agência 2 e transfira para a conta 2: 502, o saldo de origem cai e o destino não recebe |
+| 1 | Linha do tempo por Lamport | `scripts\linha-do-tempo.bat 1` |
+| 2 | Transferência assíncrona | transfira de 0 para 1 e veja `TRANSFERENCIA_ENVIADA` na Agência 0 e o crédito na Agência 1 |
+| 2 | Resiliência da fila | feche a janela da Agência 1 e transfira para a conta 1: a origem responde 200 e o painel do RabbitMQ mostra a mensagem **retida** em `fila-agencia-1` (0 consumidores) |
+| 2 | Dead-letter queue | suba a Agência 1 de novo (`$env:AGENCIA_ID=1; java -jar target\iceibank-agencia-2.0.0.jar` em `.sprints\sprint-2\agencia`): como as contas ficam em memória, a conta 1 não existe mais e o crédito vai para `fila-agencia-1.dlq` |
+| 2 | Linha do tempo com eventos concorrentes | `scripts\linha-do-tempo.bat 2` |
+| 3 | Líder e failover | feche a janela da Agência 2; em ~4 s a Agência 1 vira líder |
+| 3 | Histórico de lideranças | `scripts\historico-lideranca.bat` |
 
 #### Usando CloudAMQP em vez de Docker
 
@@ -128,7 +161,7 @@ Abra <http://localhost:5500>.
 |---|---|
 | Líder em cada agência | `4145..4147 \| % { Invoke-RestMethod "http://localhost:$_/bully/lider" }` |
 | Failover | feche a janela da **Agência 2**; em ~4 s a Agência 1 vira líder |
-| Linha do tempo causal (vetorial) | `scripts\linha-do-tempo.bat` |
+| Linha do tempo do sprint | `scripts\linha-do-tempo.bat 1` (ou `2`, ou `3`) |
 | Histórico de lideranças | `scripts\historico-lideranca.bat` |
 | Testes automatizados (89 JUnit) | `scripts\rodar-testes.bat` |
 | Painel do RabbitMQ (Docker) | <http://localhost:15672> (guest / guest) |
@@ -154,7 +187,8 @@ completo em [`03-app-mobile-flutter/README.md`](03-app-mobile-flutter/README.md)
 | `java` não é reconhecido | instale o JDK 21 marcando "Add to PATH" e abra um terminal novo |
 | "a execução de scripts foi desabilitada" | use os `.bat` ou `powershell -ExecutionPolicy Bypass -File ...` |
 | `Unable to rename ... .jar` ao recompilar | as agências estão rodando: `scripts\parar-tudo.bat` antes |
-| Porta 4145 / 5500 em uso | alguém já está rodando o projeto: `scripts\parar-tudo.bat` |
+| Porta 4145 / 5500 em uso | outro sprint (ou outra pessoa) já está rodando: `scripts\parar-tudo.bat` |
+| "Nao consegui extrair a tag sprint-N" | rode `git fetch --tags` na raiz do projeto e tente de novo |
 | Transferência entre agências dá 502 | RabbitMQ fora: suba o Docker ou defina `RABBITMQ_URL` |
 | Navegador mostra "Failed to fetch" | agência daquela porta não está no ar (veja a janela dela) |
 | Contas sumiram | o estado é em memória: reiniciar a agência zera as contas (é proposital) |
